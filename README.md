@@ -67,24 +67,24 @@ openspec init
 
 ```bash
 curl -fsSL \
-  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.0.5/bootstrap.sh" \
+  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.0.6/bootstrap.sh" \
 | bash -s -- \
     --repository xuxiaofei820825/fullstack-engineering-kit \
     --target . \
-    --version 1.0.5
+    --version 1.0.6
 ```
 
 私有仓库使用已经通过 `gh auth login` 认证的 GitHub CLI，或提前设置具有仓库读取权限的 `GH_TOKEN`：
 
 ```bash
-gh release download v1.0.5 \
+gh release download v1.0.6 \
   --repo xuxiaofei820825/fullstack-engineering-kit \
   --pattern bootstrap.sh \
   --output - \
 | bash -s -- \
     --repository xuxiaofei820825/fullstack-engineering-kit \
     --target . \
-    --version 1.0.5 \
+    --version 1.0.6 \
     --use-gh
 ```
 
@@ -98,7 +98,7 @@ gh release download v1.0.5 \
 
 ```bash
 cd /path/to/fullstack-engineering-kit
-./scripts/install.sh /path/to/target-project --version 1.0.5
+./scripts/install.sh /path/to/target-project --version 1.0.6
 ./scripts/verify-installation.sh /path/to/target-project
 ```
 
@@ -302,18 +302,18 @@ openspec archive add-order-export
 cd /path/to/target-project
 
 curl -fsSL \
-  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.0.5/bootstrap.sh" \
+  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.0.6/bootstrap.sh" \
 | bash -s -- \
     --repository xuxiaofei820825/fullstack-engineering-kit \
     --target . \
-    --version 1.0.5 \
+    --version 1.0.6 \
     --update
 ```
 
 如果已经检出本仓库，也可以使用本地安装器：
 
 ```bash
-./scripts/install.sh /path/to/target-project --update --version 1.0.5
+./scripts/install.sh /path/to/target-project --update --version 1.0.6
 ./scripts/verify-installation.sh /path/to/target-project
 ```
 
@@ -329,11 +329,11 @@ curl -fsSL \
 
 完整的版本准备、自动发布、验证和空 Release 修复步骤见 [发布指南](RELEASE.md)。
 
-`.github/workflows/release.yml` 只用于发布本规范仓库，不要求安装规范的目标项目托管在 GitHub。Pull Request 和 `main` 分支推送会运行验证；推送形如 `v1.0.5` 的标签时，发布任务会：
+`.github/workflows/release.yml` 只用于发布本规范仓库，不要求安装规范的目标项目托管在 GitHub。Pull Request 和 `main` 分支推送会运行验证；推送形如 `v1.0.6` 的标签时，发布任务会：
 
 1. 检查标签版本与 `VERSION` 完全一致。
 2. 在 GitHub 托管的 Ubuntu Runner 上执行完整 OpenSpec、Python 和安装流程验证。
-3. 构建可复现的 `fullstack-engineering-kit-1.0.5.tar.gz`。
+3. 构建可复现的 `fullstack-engineering-kit-1.0.6.tar.gz`。
 4. 生成对应的 `.sha256` 文件。
 5. 使用工作流内置的 `GITHUB_TOKEN` 创建 GitHub Release，并上传归档、校验文件和 `bootstrap.sh`。
 
@@ -341,7 +341,7 @@ curl -fsSL \
 
 ```bash
 ./scripts/build-release.sh dist
-tar -tzf dist/fullstack-engineering-kit-1.0.5.tar.gz
+tar -tzf dist/fullstack-engineering-kit-1.0.6.tar.gz
 ```
 
 创建标签前，应先更新 `VERSION`，运行完整验证，并通过代码审查。标签发布后不要复用同一版本覆盖包；修复内容应递增版本并发布新标签。

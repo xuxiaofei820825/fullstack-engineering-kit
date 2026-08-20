@@ -40,14 +40,14 @@ git status --short
 
 推荐让 `.github/workflows/release.yml` 自动创建 Release 和上传资产。不要在推送标签前手动创建同名 Release，否则工作流中的 `gh release create` 会因 Release 已存在而失败。
 
-以下示例发布 `1.0.5`。实际发布时将版本替换为新的语义版本。
+以下示例发布 `1.0.6`。实际发布时将版本替换为新的语义版本。
 
 ### 1. 更新版本
 
 修改根目录 `VERSION`：
 
 ```text
-1.0.5
+1.0.6
 ```
 
 同步更新 README 中展示给用户的安装版本，确保下载标签、`--version` 参数和 `VERSION` 一致。
@@ -67,15 +67,15 @@ git status --short
 ```bash
 ./scripts/build-release.sh dist
 ls -l dist
-tar -tzf dist/fullstack-engineering-kit-1.0.5.tar.gz
+tar -tzf dist/fullstack-engineering-kit-1.0.6.tar.gz
 ```
 
 预期生成：
 
 ```text
 dist/bootstrap.sh
-dist/fullstack-engineering-kit-1.0.5.tar.gz
-dist/fullstack-engineering-kit-1.0.5.tar.gz.sha256
+dist/fullstack-engineering-kit-1.0.6.tar.gz
+dist/fullstack-engineering-kit-1.0.6.tar.gz.sha256
 ```
 
 `dist/` 已被 `.gitignore` 忽略，不需要提交。
@@ -84,7 +84,7 @@ dist/fullstack-engineering-kit-1.0.5.tar.gz.sha256
 
 ```bash
 git add VERSION README.md
-git commit -m "chore: release v1.0.5"
+git commit -m "chore: release v1.0.6"
 git push origin main
 ```
 
@@ -95,8 +95,8 @@ git push origin main
 标签必须使用 `v<语义版本>` 格式，并与 `VERSION` 完全一致：
 
 ```bash
-git tag -a v1.0.5 -m "Release v1.0.5"
-git push origin v1.0.5
+git tag -a v1.0.6 -m "Release v1.0.6"
+git push origin v1.0.6
 ```
 
 推送标签后，GitHub Actions 会自动：
@@ -117,7 +117,7 @@ git push origin v1.0.5
 
 ```bash
 curl -fsSIL \
-  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.0.5/bootstrap.sh"
+  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.0.6/bootstrap.sh"
 ```
 
 返回 HTTP 200 后，在一个已经执行过 `openspec init` 的测试项目中验证安装：
@@ -126,11 +126,11 @@ curl -fsSIL \
 cd /path/to/test-project
 
 curl -fsSL \
-  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.0.5/bootstrap.sh" \
+  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.0.6/bootstrap.sh" \
 | bash -s -- \
     --repository xuxiaofei820825/fullstack-engineering-kit \
     --target . \
-    --version 1.0.5
+    --version 1.0.6
 
 ./scripts/verify-installation.sh .
 ./scripts/validate-engineering-standards.sh
@@ -140,7 +140,7 @@ curl -fsSL \
 
 如果 Release 已创建但没有上传资产，对应的安装 URL 会返回 HTTP 404。不要用后续代码重新构建并回填已经发布的旧版本，因为构建内容可能与旧标签不一致。
 
-本仓库的 `v1.0.4` 属于这种情况。资产前缀变更作为新版本 `v1.0.5` 发布；完成本次变更后，应按照“标准自动发布流程”推送 `v1.0.5` 标签。README 也应只推荐已经验证并包含完整资产的 `v1.0.5`。
+本仓库的 `v1.0.4` 属于这种情况。后续修复应递增版本并按照“标准自动发布流程”创建新 Release，不回填 `v1.0.4`。README 只推荐已经验证并包含完整资产的当前版本。
 
 空的旧 Release 可以保留作为历史记录。如果确认其中没有需要保留的说明或资产，也可以在 GitHub 页面删除该 Release，但不要删除或重写已经推送的标签。删除 Release 会改变远端状态，执行前应再次核对目标版本。
 
@@ -149,14 +149,14 @@ curl -fsSL \
 仅当 GitHub Actions 无法使用时，才采用手动发布。先完成前述验证和本地构建，然后执行：
 
 ```bash
-gh release create v1.0.5 \
-  dist/fullstack-engineering-kit-1.0.5.tar.gz \
-  dist/fullstack-engineering-kit-1.0.5.tar.gz.sha256 \
+gh release create v1.0.6 \
+  dist/fullstack-engineering-kit-1.0.6.tar.gz \
+  dist/fullstack-engineering-kit-1.0.6.tar.gz.sha256 \
   dist/bootstrap.sh \
   --repo xuxiaofei820825/fullstack-engineering-kit \
   --verify-tag \
   --generate-notes \
-  --title "Fullstack Engineering Kit 1.0.5"
+  --title "Fullstack Engineering Kit 1.0.6"
 ```
 
 手动发布前必须先将对应标签推送到远端。发布后仍需检查资产 URL，并执行一次实际安装验证。
@@ -173,7 +173,7 @@ gh release create v1.0.5 \
 
 ### 标签版本检查失败
 
-确认标签去掉前缀 `v` 后与 `VERSION` 完全一致。例如 `VERSION` 为 `1.0.5` 时，标签必须为 `v1.0.5`。
+确认标签去掉前缀 `v` 后与 `VERSION` 完全一致。例如 `VERSION` 为 `1.0.6` 时，标签必须为 `v1.0.6`。
 
 ### 不要使用 main 或 latest 安装
 
