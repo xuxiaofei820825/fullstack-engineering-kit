@@ -107,7 +107,7 @@ git push origin v1.0.5
 4. 构建压缩包、SHA-256 文件和 `bootstrap.sh`。
 5. 创建 GitHub Release 并上传三个资产。
 
-在仓库的 [Actions](https://github.com/xuxiaofei820825/fullstack-engineering-kit/actions) 页面确认 `Validate and release engineering standards` 工作流成功。
+在仓库的 [Actions](https://github.com/xuxiaofei820825/fullstack-engineering-kit/actions) 页面确认 `Validate and release Fullstack Engineering Kit` 工作流成功。
 
 ### 6. 验证 Release
 
@@ -156,7 +156,7 @@ gh release create v1.0.5 \
   --repo xuxiaofei820825/fullstack-engineering-kit \
   --verify-tag \
   --generate-notes \
-  --title "Engineering Standards 1.0.5"
+  --title "Fullstack Engineering Kit 1.0.5"
 ```
 
 手动发布前必须先将对应标签推送到远端。发布后仍需检查资产 URL，并执行一次实际安装验证。

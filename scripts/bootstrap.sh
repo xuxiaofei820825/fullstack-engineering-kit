@@ -3,6 +3,7 @@ set -euo pipefail
 
 package_name="fullstack-engineering-kit"
 repository="${ENGINEERING_STANDARDS_GITHUB_REPOSITORY:-}"
+repository="${FULLSTACK_ENGINEERING_KIT_GITHUB_REPOSITORY:-$repository}"
 target="."
 version=""
 update=false
@@ -56,7 +57,7 @@ if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 2
 fi
 if [[ ! "$repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
-  echo "ERROR: 必须通过 --repository 或 ENGINEERING_STANDARDS_GITHUB_REPOSITORY 提供 OWNER/REPO" >&2
+  echo "ERROR: 必须通过 --repository 或 FULLSTACK_ENGINEERING_KIT_GITHUB_REPOSITORY 提供 OWNER/REPO" >&2
   exit 2
 fi
 if [[ ! -d "$target" ]]; then
@@ -78,7 +79,7 @@ if [[ "$use_gh" == true ]]; then
   fi
 fi
 
-temporary_dir="$(mktemp -d "${TMPDIR:-/tmp}/engineering-standards.XXXXXX")"
+temporary_dir="$(mktemp -d "${TMPDIR:-/tmp}/fullstack-engineering-kit.XXXXXX")"
 trap 'rm -rf "$temporary_dir"' EXIT
 
 archive_name="${package_name}-${version}.tar.gz"

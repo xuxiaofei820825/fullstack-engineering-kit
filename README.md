@@ -88,7 +88,7 @@ gh release download v1.0.5 \
     --use-gh
 ```
 
-也可以通过 `ENGINEERING_STANDARDS_GITHUB_REPOSITORY=xuxiaofei820825/fullstack-engineering-kit` 设置默认仓库。安装命令必须明确指定语义版本，不接受 `main` 或 `latest`。升级时把版本改为目标版本并增加 `--update`。
+也可以通过 `FULLSTACK_ENGINEERING_KIT_GITHUB_REPOSITORY=xuxiaofei820825/fullstack-engineering-kit` 设置默认仓库。旧环境变量 `ENGINEERING_STANDARDS_GITHUB_REPOSITORY` 暂时兼容；同时设置时优先使用新名称。安装命令必须明确指定语义版本，不接受 `main` 或 `latest`。升级时把版本改为目标版本并增加 `--update`。
 
 应将发布标签配置为受保护标签，并要求用户从可信渠道取得版本号和仓库地址。SHA-256 可以发现传输损坏或发布资产不一致，但不能替代 GitHub 权限控制、HTTPS 和受保护标签。
 
@@ -108,7 +108,9 @@ cd /path/to/fullstack-engineering-kit
 - `openspec/schemas/engineering-governed/`
 - design 校验器及其测试
 - 平台无关的统一质量门禁脚本
-- `.engineering-standards-version`
+- `.fullstack-engineering-kit-version`
+
+从旧版本升级时，安装器会识别 `.engineering-standards-version`；使用 `--update` 成功升级后会写入新标记并删除旧标记。
 
 目标项目没有 `openspec/config.yaml` 时，安装器使用本仓库的配置作为初始值。执行过 `openspec init` 的项目通常已经存在配置；此时安装器只把顶层 `schema` 更新为 `engineering-governed`，保留已有 context、rules 和其他项目配置。强制工作流规则维护在 schema 中，因此不会依赖目标项目复制本仓库的 context。
 
@@ -294,7 +296,21 @@ openspec archive add-order-export
 
 ## 升级规范套件
 
-优先使用上面的远程安装命令并增加 `--update`。如果已经检出本仓库，也可以执行：
+在目标项目中直接使用 GitHub Release 提供的 `bootstrap.sh`，把版本号改为需要升级到的明确版本，并增加 `--update`：
+
+```bash
+cd /path/to/target-project
+
+curl -fsSL \
+  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.0.5/bootstrap.sh" \
+| bash -s -- \
+    --repository xuxiaofei820825/fullstack-engineering-kit \
+    --target . \
+    --version 1.0.5 \
+    --update
+```
+
+如果已经检出本仓库，也可以使用本地安装器：
 
 ```bash
 ./scripts/install.sh /path/to/target-project --update --version 1.0.5

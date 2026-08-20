@@ -15,7 +15,8 @@ from pathlib import Path
 
 
 SCHEMA_NAME = "engineering-governed"
-VERSION_FILE = ".engineering-standards-version"
+VERSION_FILE = ".fullstack-engineering-kit-version"
+LEGACY_VERSION_FILE = ".engineering-standards-version"
 MANAGED_PATHS = (
     Path(".agents/skills/full-stack-engineering-practices"),
     Path("openspec/schemas/engineering-governed"),
@@ -106,7 +107,9 @@ def atomic_write(path: Path, content: str) -> None:
 
 def replace_managed_path(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    staging_root = Path(tempfile.mkdtemp(prefix=".engineering-standards-", dir=destination.parent))
+    staging_root = Path(
+        tempfile.mkdtemp(prefix=".fullstack-engineering-kit-", dir=destination.parent)
+    )
     staged = staging_root / destination.name
     backup = staging_root / "previous"
     try:
@@ -150,9 +153,17 @@ def install(target: Path, update: bool, expected_version: str | None, dry_run: b
         operations.append((source, destination))
 
     target_version = target / VERSION_FILE
+    legacy_target_version = target / LEGACY_VERSION_FILE
     if target_version.exists() and target_version.read_text(encoding="utf-8").strip() != version:
         if not update:
             conflicts.append(Path(VERSION_FILE))
+    elif (
+        not target_version.exists()
+        and legacy_target_version.exists()
+        and legacy_target_version.read_text(encoding="utf-8").strip() != version
+        and not update
+    ):
+        conflicts.append(Path(LEGACY_VERSION_FILE))
 
     if conflicts:
         formatted = "\n".join(f"  - {path}" for path in conflicts)
@@ -175,6 +186,8 @@ def install(target: Path, update: bool, expected_version: str | None, dry_run: b
         changes.append("openspec/config.yaml")
     if not target_version.exists() or target_version.read_text(encoding="utf-8").strip() != version:
         changes.append(VERSION_FILE)
+    if legacy_target_version.exists():
+        changes.append(f"{LEGACY_VERSION_FILE}（删除旧版标记）")
 
     if dry_run:
         return changes
@@ -184,6 +197,7 @@ def install(target: Path, update: bool, expected_version: str | None, dry_run: b
     if current_config != new_config:
         atomic_write(config_path, new_config)
     atomic_write(target_version, f"{version}\n")
+    legacy_target_version.unlink(missing_ok=True)
     return changes
 
 

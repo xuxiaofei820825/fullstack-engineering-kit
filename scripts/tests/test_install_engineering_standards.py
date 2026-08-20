@@ -49,7 +49,9 @@ class InstallEngineeringStandardsTest(unittest.TestCase):
         self.assertEqual(0o640, stat.S_IMODE(config.stat().st_mode))
         self.assertEqual(
             BUNDLE_VERSION,
-            (self.target / ".engineering-standards-version").read_text(encoding="utf-8").strip(),
+            (self.target / ".fullstack-engineering-kit-version")
+            .read_text(encoding="utf-8")
+            .strip(),
         )
         validation_entrypoint = self.target / "scripts/validate-engineering-standards.sh"
         self.assertTrue(validation_entrypoint.is_file())
@@ -69,6 +71,32 @@ class InstallEngineeringStandardsTest(unittest.TestCase):
         )
         self.assertEqual(0, second.returncode, second.stderr)
         self.assertIn("无需更新", second.stdout)
+
+    def test_update_migrates_legacy_version_file(self) -> None:
+        legacy_version = self.target / ".engineering-standards-version"
+        legacy_version.write_text("1.0.4\n", encoding="utf-8")
+
+        refused = self.run_script(INSTALLER, str(self.target))
+
+        self.assertEqual(2, refused.returncode)
+        self.assertIn(".engineering-standards-version", refused.stderr)
+        self.assertTrue(legacy_version.exists())
+        self.assertFalse((self.target / ".fullstack-engineering-kit-version").exists())
+
+        legacy_verification = self.run_script(VERIFIER, str(self.target), "--files-only")
+        self.assertEqual(1, legacy_verification.returncode)
+        self.assertIn("检测到旧版标记", legacy_verification.stderr)
+
+        updated = self.run_script(INSTALLER, str(self.target), "--update")
+
+        self.assertEqual(0, updated.returncode, updated.stderr)
+        self.assertFalse(legacy_version.exists())
+        self.assertEqual(
+            BUNDLE_VERSION,
+            (self.target / ".fullstack-engineering-kit-version")
+            .read_text(encoding="utf-8")
+            .strip(),
+        )
 
     def test_conflict_requires_explicit_update(self) -> None:
         installed = self.run_script(INSTALLER, str(self.target))

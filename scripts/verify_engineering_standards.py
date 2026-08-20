@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from install_engineering_standards import (
+    LEGACY_VERSION_FILE,
     MANAGED_PATHS,
     VERSION_FILE,
     bundle_version,
@@ -29,13 +30,21 @@ def verify(target: Path, run_commands: bool = True) -> list[str]:
     errors: list[str] = []
     expected_version = bundle_version(root)
     installed_version = target / VERSION_FILE
+    legacy_installed_version = target / LEGACY_VERSION_FILE
     if not installed_version.is_file():
-        errors.append(f"缺少 {VERSION_FILE}")
+        if legacy_installed_version.is_file():
+            errors.append(
+                f"检测到旧版标记 {LEGACY_VERSION_FILE}，请使用安装器的 --update 完成迁移"
+            )
+        else:
+            errors.append(f"缺少 {VERSION_FILE}")
     elif installed_version.read_text(encoding="utf-8").strip() != expected_version:
         errors.append(
             f"安装版本不是 {expected_version}："
             f"{installed_version.read_text(encoding='utf-8').strip()}"
         )
+    elif legacy_installed_version.exists():
+        errors.append(f"仍残留旧版标记 {LEGACY_VERSION_FILE}，请使用安装器的 --update 清理")
 
     for relative in MANAGED_PATHS:
         source = root / relative

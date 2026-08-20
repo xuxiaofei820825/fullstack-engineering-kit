@@ -99,8 +99,6 @@ shutil.copyfile(source, output)
             installed = subprocess.run(
                 [
                     str(BOOTSTRAP),
-                    "--repository",
-                    "company/coding-standards",
                     "--version",
                     VERSION,
                     "--target",
@@ -109,7 +107,11 @@ shutil.copyfile(source, output)
                 cwd=REPOSITORY_ROOT,
                 env={
                     **os.environ,
+                    "ENGINEERING_STANDARDS_GITHUB_REPOSITORY": "invalid",
                     "FAKE_CURL_PACKAGE_DIR": str(package_dir),
+                    "FULLSTACK_ENGINEERING_KIT_GITHUB_REPOSITORY": (
+                        "company/fullstack-engineering-kit"
+                    ),
                     "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
                 },
                 check=False,
@@ -120,7 +122,9 @@ shutil.copyfile(source, output)
             self.assertEqual(0, installed.returncode, installed.stderr)
             self.assertEqual(
                 VERSION,
-                (target / ".engineering-standards-version").read_text(encoding="utf-8").strip(),
+                (target / ".fullstack-engineering-kit-version")
+                .read_text(encoding="utf-8")
+                .strip(),
             )
             self.assertTrue(
                 (target / ".agents/skills/full-stack-engineering-practices/SKILL.md").is_file()
@@ -128,7 +132,7 @@ shutil.copyfile(source, output)
 
     def test_bootstrap_requires_an_explicit_version(self) -> None:
         result = subprocess.run(
-            [str(BOOTSTRAP), "--repository", "company/coding-standards"],
+            [str(BOOTSTRAP), "--repository", "company/fullstack-engineering-kit"],
             cwd=REPOSITORY_ROOT,
             check=False,
             capture_output=True,
@@ -168,7 +172,7 @@ shutil.copyfile(Path(os.environ['FAKE_GH_RELEASE_DIR']) / asset, output)
                 [
                     str(BOOTSTRAP),
                     "--repository",
-                    "company/coding-standards",
+                    "company/fullstack-engineering-kit",
                     "--version",
                     VERSION,
                     "--target",
@@ -224,8 +228,6 @@ shutil.copyfile(Path(os.environ['FAKE_CURL_PACKAGE_DIR']) / Path(urlparse(url).p
             installed = subprocess.run(
                 [
                     str(BOOTSTRAP),
-                    "--repository",
-                    "company/coding-standards",
                     "--version",
                     VERSION,
                     "--target",
@@ -234,6 +236,8 @@ shutil.copyfile(Path(os.environ['FAKE_CURL_PACKAGE_DIR']) / Path(urlparse(url).p
                 cwd=REPOSITORY_ROOT,
                 env={
                     **os.environ,
+                    "ENGINEERING_STANDARDS_GITHUB_REPOSITORY": "company/fullstack-engineering-kit",
+                    "FULLSTACK_ENGINEERING_KIT_GITHUB_REPOSITORY": "",
                     "FAKE_CURL_PACKAGE_DIR": str(package_dir),
                     "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
                 },

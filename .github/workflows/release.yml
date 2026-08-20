@@ -1,4 +1,4 @@
-name: Validate and release engineering standards
+name: Validate and release Fullstack Engineering Kit
 
 on:
   pull_request:
@@ -27,7 +27,7 @@ jobs:
           node-version: "22"
       - name: Install OpenSpec
         run: npm install --global @fission-ai/openspec@1.9.0
-      - name: Validate engineering standards
+      - name: Validate Fullstack Engineering Kit
         run: ./scripts/validate-engineering-standards.sh
 
   release:
@@ -62,4 +62,4 @@ jobs:
             "dist/bootstrap.sh" \
             --verify-tag \
             --generate-notes \
-            --title "Engineering Standards ${version}"
+            --title "Fullstack Engineering Kit ${version}"
