@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-package_name="engineering-standards"
+package_name="fullstack-engineering-kit"
 repository="${ENGINEERING_STANDARDS_GITHUB_REPOSITORY:-}"
 target="."
 version=""

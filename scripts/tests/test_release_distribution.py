@@ -14,7 +14,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 BUILD_SCRIPT = REPOSITORY_ROOT / "scripts/build-release.sh"
 BOOTSTRAP = REPOSITORY_ROOT / "scripts/bootstrap.sh"
 VERSION = (REPOSITORY_ROOT / "VERSION").read_text(encoding="utf-8").strip()
-ARCHIVE_NAME = f"engineering-standards-{VERSION}.tar.gz"
+ARCHIVE_NAME = f"fullstack-engineering-kit-{VERSION}.tar.gz"
 
 
 class ReleaseDistributionTest(unittest.TestCase):
@@ -51,7 +51,7 @@ class ReleaseDistributionTest(unittest.TestCase):
             )
             with tarfile.open(first_archive, "r:gz") as archive:
                 names = set(archive.getnames())
-                prefix = f"engineering-standards-{VERSION}"
+                prefix = f"fullstack-engineering-kit-{VERSION}"
                 self.assertIn(f"{prefix}/VERSION", names)
                 self.assertIn(f"{prefix}/scripts/install.sh", names)
                 self.assertIn(

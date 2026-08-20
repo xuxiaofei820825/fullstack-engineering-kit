@@ -15,7 +15,7 @@ from pathlib import Path
 from install_engineering_standards import MANAGED_PATHS, bundle_version, source_root
 
 
-PACKAGE_NAME = "engineering-standards"
+PACKAGE_NAME = "fullstack-engineering-kit"
 PACKAGE_PATHS = (
     Path("VERSION"),
     Path("README.md"),

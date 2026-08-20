@@ -1,4 +1,4 @@
-# coding-standards
+# fullstack-engineering-kit
 
 本仓库将 OpenSpec 的规格驱动流程与 Codex Skill 结合，用同一套编码规范约束设计、任务拆分、实现、测试、代码审查和交付。
 
@@ -61,34 +61,34 @@ openspec init
 
 ### 从 GitHub Releases 一步安装
 
-本仓库通过 GitHub Releases 发布版本化的完整安装包。用户不需要 clone 本仓库；`bootstrap.sh` 会把指定版本下载到临时目录，校验 SHA-256，调用原有安装器，并在完成后清理临时文件。以下命令中的 `OWNER/REPO` 需要替换为实际 GitHub 仓库，例如 `company/coding-standards`。
+本仓库通过 GitHub Releases 发布版本化的完整安装包。用户不需要 clone 本仓库；`bootstrap.sh` 会把指定版本下载到临时目录，校验 SHA-256，调用原有安装器，并在完成后清理临时文件。
 
 公开仓库在已经执行过 `openspec init` 的目标项目中运行：
 
 ```bash
 curl -fsSL \
-  "https://github.com/OWNER/REPO/releases/download/v1.0.4/bootstrap.sh" \
+  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.0.5/bootstrap.sh" \
 | bash -s -- \
-    --repository OWNER/REPO \
+    --repository xuxiaofei820825/fullstack-engineering-kit \
     --target . \
-    --version 1.0.4
+    --version 1.0.5
 ```
 
 私有仓库使用已经通过 `gh auth login` 认证的 GitHub CLI，或提前设置具有仓库读取权限的 `GH_TOKEN`：
 
 ```bash
-gh release download v1.0.4 \
-  --repo OWNER/REPO \
+gh release download v1.0.5 \
+  --repo xuxiaofei820825/fullstack-engineering-kit \
   --pattern bootstrap.sh \
   --output - \
 | bash -s -- \
-    --repository OWNER/REPO \
+    --repository xuxiaofei820825/fullstack-engineering-kit \
     --target . \
-    --version 1.0.4 \
+    --version 1.0.5 \
     --use-gh
 ```
 
-也可以通过 `ENGINEERING_STANDARDS_GITHUB_REPOSITORY` 设置默认仓库。安装命令必须明确指定语义版本，不接受 `main` 或 `latest`。升级时把版本改为目标版本并增加 `--update`。
+也可以通过 `ENGINEERING_STANDARDS_GITHUB_REPOSITORY=xuxiaofei820825/fullstack-engineering-kit` 设置默认仓库。安装命令必须明确指定语义版本，不接受 `main` 或 `latest`。升级时把版本改为目标版本并增加 `--update`。
 
 应将发布标签配置为受保护标签，并要求用户从可信渠道取得版本号和仓库地址。SHA-256 可以发现传输损坏或发布资产不一致，但不能替代 GitHub 权限控制、HTTPS 和受保护标签。
 
@@ -97,8 +97,8 @@ gh release download v1.0.4 \
 开发或排查发布流程时，也可以从本仓库对应版本执行安装：
 
 ```bash
-cd /path/to/coding-standards
-./scripts/install.sh /path/to/target-project --version 1.0.4
+cd /path/to/fullstack-engineering-kit
+./scripts/install.sh /path/to/target-project --version 1.0.5
 ./scripts/verify-installation.sh /path/to/target-project
 ```
 
@@ -297,7 +297,7 @@ openspec archive add-order-export
 优先使用上面的远程安装命令并增加 `--update`。如果已经检出本仓库，也可以执行：
 
 ```bash
-./scripts/install.sh /path/to/target-project --update --version 1.0.4
+./scripts/install.sh /path/to/target-project --update --version 1.0.5
 ./scripts/verify-installation.sh /path/to/target-project
 ```
 
@@ -311,11 +311,13 @@ openspec archive add-order-export
 
 ## 发布到 GitHub Releases
 
-`.github/workflows/release.yml` 只用于发布本规范仓库，不要求安装规范的目标项目托管在 GitHub。Pull Request 和 `main` 分支推送会运行验证；推送形如 `v1.0.4` 的标签时，发布任务会：
+完整的版本准备、自动发布、验证和空 Release 修复步骤见 [发布指南](RELEASE.md)。
+
+`.github/workflows/release.yml` 只用于发布本规范仓库，不要求安装规范的目标项目托管在 GitHub。Pull Request 和 `main` 分支推送会运行验证；推送形如 `v1.0.5` 的标签时，发布任务会：
 
 1. 检查标签版本与 `VERSION` 完全一致。
 2. 在 GitHub 托管的 Ubuntu Runner 上执行完整 OpenSpec、Python 和安装流程验证。
-3. 构建可复现的 `engineering-standards-1.0.4.tar.gz`。
+3. 构建可复现的 `fullstack-engineering-kit-1.0.5.tar.gz`。
 4. 生成对应的 `.sha256` 文件。
 5. 使用工作流内置的 `GITHUB_TOKEN` 创建 GitHub Release，并上传归档、校验文件和 `bootstrap.sh`。
 
@@ -323,7 +325,7 @@ openspec archive add-order-export
 
 ```bash
 ./scripts/build-release.sh dist
-tar -tzf dist/engineering-standards-1.0.4.tar.gz
+tar -tzf dist/fullstack-engineering-kit-1.0.5.tar.gz
 ```
 
 创建标签前，应先更新 `VERSION`，运行完整验证，并通过代码审查。标签发布后不要复用同一版本覆盖包；修复内容应递增版本并发布新标签。

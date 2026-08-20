@@ -57,8 +57,8 @@ jobs:
         run: |
           version="$(tr -d '\r\n' < VERSION)"
           gh release create "$GITHUB_REF_NAME" \
-            "dist/engineering-standards-${version}.tar.gz" \
-            "dist/engineering-standards-${version}.tar.gz.sha256" \
+            "dist/fullstack-engineering-kit-${version}.tar.gz" \
+            "dist/fullstack-engineering-kit-${version}.tar.gz.sha256" \
             "dist/bootstrap.sh" \
             --verify-tag \
             --generate-notes \
