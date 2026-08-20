@@ -1,0 +1,4 @@
+interface:
+  display_name: "全栈工程实践"
+  short_description: "统一指导前端、后端及跨端功能的实现、测试、联调与交付"
+  default_prompt: "使用 $full-stack-engineering-practices 按仓库工程规范实现并验证这个功能。"

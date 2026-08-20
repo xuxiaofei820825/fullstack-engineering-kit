@@ -1,0 +1,127 @@
+from __future__ import annotations
+
+import stat
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+INSTALLER = REPOSITORY_ROOT / "scripts/install_engineering_standards.py"
+VERIFIER = REPOSITORY_ROOT / "scripts/verify_engineering_standards.py"
+BUNDLE_VERSION = (REPOSITORY_ROOT / "VERSION").read_text(encoding="utf-8").strip()
+
+
+class InstallEngineeringStandardsTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.target = Path(self.temp_dir.name)
+
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
+
+    def run_script(self, script: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, "-B", str(script), *arguments],
+            cwd=REPOSITORY_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def test_installs_bundle_and_preserves_existing_config(self) -> None:
+        config = self.target / "openspec/config.yaml"
+        config.parent.mkdir(parents=True)
+        config.write_text(
+            "schema: spec-driven\n\ncontext: |\n  Domain: example\n",
+            encoding="utf-8",
+        )
+        config.chmod(0o640)
+
+        result = self.run_script(INSTALLER, str(self.target), "--version", BUNDLE_VERSION)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        installed_config = config.read_text(encoding="utf-8")
+        self.assertIn("schema: engineering-governed", installed_config)
+        self.assertIn("Domain: example", installed_config)
+        self.assertEqual(0o640, stat.S_IMODE(config.stat().st_mode))
+        self.assertEqual(
+            BUNDLE_VERSION,
+            (self.target / ".engineering-standards-version").read_text(encoding="utf-8").strip(),
+        )
+        validation_entrypoint = self.target / "scripts/validate-engineering-standards.sh"
+        self.assertTrue(validation_entrypoint.is_file())
+        self.assertTrue(validation_entrypoint.stat().st_mode & 0o111)
+        self.assertFalse((self.target / ".github").exists())
+        verification = self.run_script(VERIFIER, str(self.target), "--files-only")
+        self.assertEqual(0, verification.returncode, verification.stderr)
+
+    def test_is_idempotent(self) -> None:
+        first = self.run_script(INSTALLER, str(self.target))
+        second = self.run_script(INSTALLER, str(self.target))
+
+        self.assertEqual(0, first.returncode, first.stderr)
+        self.assertEqual(
+            (REPOSITORY_ROOT / "openspec/config.yaml").read_bytes(),
+            (self.target / "openspec/config.yaml").read_bytes(),
+        )
+        self.assertEqual(0, second.returncode, second.stderr)
+        self.assertIn("无需更新", second.stdout)
+
+    def test_conflict_requires_explicit_update(self) -> None:
+        installed = self.run_script(INSTALLER, str(self.target))
+        self.assertEqual(0, installed.returncode, installed.stderr)
+        template = (
+            self.target / "openspec/schemas/engineering-governed/templates/design.md"
+        )
+        template.write_text(template.read_text(encoding="utf-8") + "\nlocal edit\n", encoding="utf-8")
+
+        refused = self.run_script(INSTALLER, str(self.target))
+
+        self.assertEqual(2, refused.returncode)
+        self.assertIn("未写入任何文件", refused.stderr)
+        self.assertIn("local edit", template.read_text(encoding="utf-8"))
+
+        updated = self.run_script(INSTALLER, str(self.target), "--update")
+        self.assertEqual(0, updated.returncode, updated.stderr)
+        self.assertNotIn("local edit", template.read_text(encoding="utf-8"))
+
+    def test_version_mismatch_and_dry_run_do_not_write(self) -> None:
+        mismatch = self.run_script(INSTALLER, str(self.target), "--version", "9.9.9")
+        self.assertEqual(2, mismatch.returncode)
+        self.assertFalse((self.target / ".agents").exists())
+
+        dry_run = self.run_script(INSTALLER, str(self.target), "--dry-run")
+        self.assertEqual(0, dry_run.returncode, dry_run.stderr)
+        self.assertFalse((self.target / ".agents").exists())
+        self.assertFalse((self.target / "openspec/config.yaml").exists())
+
+    def test_ambiguous_config_is_rejected_before_writes(self) -> None:
+        config = self.target / "openspec/config.yaml"
+        config.parent.mkdir(parents=True)
+        config.write_text("schema: first\nschema: second\n", encoding="utf-8")
+
+        result = self.run_script(INSTALLER, str(self.target))
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("多个顶层 schema", result.stderr)
+        self.assertFalse((self.target / ".agents").exists())
+
+    def test_preserves_crlf_and_yaml_document_marker(self) -> None:
+        config = self.target / "openspec/config.yaml"
+        config.parent.mkdir(parents=True)
+        config.write_bytes(b"---\r\nschema: spec-driven\r\ncontext: value\r\n")
+
+        result = self.run_script(INSTALLER, str(self.target))
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(
+            b"---\r\nschema: engineering-governed\r\ncontext: value\r\n",
+            config.read_bytes(),
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

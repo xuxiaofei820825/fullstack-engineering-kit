@@ -1,0 +1,8 @@
+schema: engineering-governed
+
+context: |
+  语言：中文（简体）。
+  所有产出物必须用简体中文撰写。
+  编码规范的唯一入口是 `.agents/skills/full-stack-engineering-practices/SKILL.md`。
+  涉及技术设计、任务拆分、编码、测试、Review 或交付时，必须先读取该 Skill，再按照其路由规则加载与变更范围相关的 references。
+  规范引用统一使用“reference 文件路径 + 章节标题”。

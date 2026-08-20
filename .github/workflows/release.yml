@@ -1,0 +1,65 @@
+name: Validate and release engineering standards
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install OpenSpec
+        run: npm install --global @fission-ai/openspec@1.9.0
+      - name: Validate engineering standards
+        run: ./scripts/validate-engineering-standards.sh
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check release version
+        shell: bash
+        run: |
+          release_version="${GITHUB_REF_NAME#v}"
+          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$release_version" = "$(tr -d '\r\n' < VERSION)"
+      - name: Build release assets
+        run: ./scripts/build-release.sh dist
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(tr -d '\r\n' < VERSION)"
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/engineering-standards-${version}.tar.gz" \
+            "dist/engineering-standards-${version}.tar.gz.sha256" \
+            "dist/bootstrap.sh" \
+            --verify-tag \
+            --generate-notes \
+            --title "Engineering Standards ${version}"
