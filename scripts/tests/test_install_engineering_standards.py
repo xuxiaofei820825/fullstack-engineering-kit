@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import stat
 import subprocess
@@ -93,6 +94,44 @@ class InstallEngineeringStandardsTest(unittest.TestCase):
         self.assertIn(".codex/skills/full-stack-engineering-practices", schema.read_text())
         verification = self.run_script(VERIFIER, str(self.target), "--files-only")
         self.assertEqual(0, verification.returncode, verification.stderr)
+
+    def test_verify_validates_active_changes_without_validating_synced_specs(self) -> None:
+        installed = self.run_script(INSTALLER, str(self.target))
+        self.assertEqual(0, installed.returncode, installed.stderr)
+        fake_bin = self.target / "test-bin"
+        fake_bin.mkdir()
+        command_log = self.target / "openspec-commands.log"
+        fake_openspec = fake_bin / "openspec"
+        fake_openspec.write_text(
+            "#!/usr/bin/env python3\n"
+            "import os\n"
+            "import sys\n"
+            "from pathlib import Path\n"
+            "path = Path(os.environ['FSEK_TEST_COMMAND_LOG'])\n"
+            "with path.open('a', encoding='utf-8') as handle:\n"
+            "    handle.write(' '.join(sys.argv[1:]) + '\\n')\n",
+            encoding="utf-8",
+        )
+        fake_openspec.chmod(0o755)
+
+        verification = subprocess.run(
+            [sys.executable, "-B", str(VERIFIER), str(self.target)],
+            cwd=REPOSITORY_ROOT,
+            env={
+                **os.environ,
+                "FSEK_TEST_COMMAND_LOG": str(command_log),
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+            },
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, verification.returncode, verification.stderr)
+        commands = command_log.read_text(encoding="utf-8")
+        self.assertIn("validate --changes --strict --no-interactive", commands)
+        self.assertNotIn("validate --all", commands)
+        self.assertNotIn("validate --specs", commands)
 
     def test_supports_claude_code_platform(self) -> None:
         result = self.run_script(

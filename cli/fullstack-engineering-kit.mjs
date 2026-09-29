@@ -2,7 +2,16 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, resolve } from "node:path";
@@ -24,6 +33,20 @@ const platforms = [
   { id: "codex", label: "Codex", directory: ".codex" },
   { id: "claude", label: "Claude Code", directory: ".claude" },
   { id: "opencode", label: "OpenCode", directory: ".opencode" },
+];
+const openSpecSkillNames = [
+  "openspec-explore",
+  "openspec-new-change",
+  "openspec-continue-change",
+  "openspec-apply-change",
+  "openspec-update-change",
+  "openspec-ff-change",
+  "openspec-sync-specs",
+  "openspec-archive-change",
+  "openspec-bulk-archive-change",
+  "openspec-verify-change",
+  "openspec-onboard",
+  "openspec-propose",
 ];
 
 class CliError extends Error {
@@ -243,10 +266,51 @@ async function selectPlatform(target, requested, assumeYes, allowInstalled) {
 }
 
 function findOpenSpec() {
-  const candidates = existsSync(bundledOpenSpec) ? [bundledOpenSpec, "openspec"] : ["openspec"];
+  const configured = process.env.FSEK_OPENSPEC;
+  const candidates = configured
+    ? [configured]
+    : existsSync(bundledOpenSpec) ? [bundledOpenSpec, "openspec"] : ["openspec"];
   const command = candidates.find((candidate) => commandAvailable(candidate));
   if (command) return command;
   throw new CliError("OpenSpec 1.9.0 was not found. Reinstall the Fullstack Engineering Kit CLI.");
+}
+
+function removeEmptyDirectory(path) {
+  try {
+    rmdirSync(path);
+  } catch (error) {
+    if (error.code !== "ENOENT" && error.code !== "ENOTEMPTY") throw error;
+  }
+}
+
+function relocateCodexOpenSpecSkills(target) {
+  const agentsSkills = resolve(target, ".agents/skills");
+  const marker = resolve(agentsSkills, ".openspec-target");
+  const markerOwner = existsSync(marker) ? readFileSync(marker, "utf8").trim() : undefined;
+  const inferredCodexOwner = openSpecSkillNames.some((name) => {
+    const skill = resolve(agentsSkills, name, "SKILL.md");
+    return existsSync(skill) && readFileSync(skill, "utf8").includes("$openspec-");
+  });
+  const codexOwned = markerOwner ? markerOwner === "codex" : inferredCodexOwner;
+  if (!codexOwned) return;
+
+  const codexSkills = resolve(target, ".codex/skills");
+  mkdirSync(codexSkills, { recursive: true });
+  let moved = 0;
+  for (const name of openSpecSkillNames) {
+    const source = resolve(agentsSkills, name);
+    if (!existsSync(source)) continue;
+    const destination = resolve(codexSkills, name);
+    rmSync(destination, { recursive: true, force: true });
+    renameSync(source, destination);
+    moved += 1;
+  }
+  if (markerOwner === "codex") rmSync(marker, { force: true });
+  removeEmptyDirectory(agentsSkills);
+  removeEmptyDirectory(resolve(target, ".agents"));
+  if (moved > 0) {
+    process.stdout.write(`Moved ${moved} OpenSpec skill(s) to .codex/skills.\n`);
+  }
 }
 
 function installBundle(python, target, platform, options) {
@@ -281,6 +345,7 @@ async function initialize(options, colors) {
     if (options.force) arguments_.push("--force");
     const result = run(openSpec, arguments_);
     if (result.status !== 0) throw new CliError("OpenSpec initialization failed.", result.status ?? 1);
+    if (platform === "codex") relocateCodexOpenSpecSkills(target);
   }
   installBundle(python, target, platform, options);
   if (!options.dryRun) {
@@ -309,6 +374,7 @@ async function update(options, colors) {
   if (openSpec) {
     const result = run(openSpec, ["update", target]);
     if (result.status !== 0) throw new CliError("OpenSpec instruction update failed.", result.status ?? 1);
+    if (platform === "codex") relocateCodexOpenSpecSkills(target);
   }
   if (!options.dryRun) process.stdout.write(colors.green("\nUpdate complete.\n"));
 }

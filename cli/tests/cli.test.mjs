@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -97,6 +104,46 @@ test("update keeps the platform recorded during initialization", () => {
 
   assert.equal(updated.status, 0, updated.stderr);
   assert.match(updated.stdout, /for claude/);
+});
+
+test("update keeps Codex OpenSpec skills out of .agents", async () => {
+  const target = mkdtempSync(resolve(tmpdir(), "fsek-cli-codex-update-"));
+  const initialized = run("init", target, "--platform", "codex", "--skip-openspec");
+  assert.equal(initialized.status, 0, initialized.stderr);
+  mkdirSync(resolve(target, ".agents"), { recursive: true });
+  writeFileSync(resolve(target, ".agents/user-owned.txt"), "preserve\n", "utf8");
+
+  const temporary = mkdtempSync(resolve(tmpdir(), "fsek-openspec-mock-"));
+  const fakeOpenSpec = resolve(temporary, "openspec-mock.mjs");
+  writeFileSync(
+    fakeOpenSpec,
+    `#!/usr/bin/env node
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+if (process.argv[2] === "update") {
+  const skills = resolve(process.argv[3], ".agents/skills");
+  mkdirSync(resolve(skills, "openspec-propose"), { recursive: true });
+  writeFileSync(resolve(skills, ".openspec-target"), "codex\\n");
+  writeFileSync(resolve(skills, "openspec-propose/SKILL.md"), "Use $openspec-propose\\n");
+}
+`,
+    "utf8",
+  );
+  chmodSync(fakeOpenSpec, 0o755);
+
+  const updated = await runAsync(
+    ["update", target],
+    { FSEK_OPENSPEC: fakeOpenSpec },
+  );
+
+  assert.equal(updated.status, 0, updated.stderr);
+  assert.equal(
+    existsSync(resolve(target, ".codex/skills/openspec-propose/SKILL.md")),
+    true,
+  );
+  assert.equal(existsSync(resolve(target, ".agents/skills/openspec-propose")), false);
+  assert.equal(existsSync(resolve(target, ".agents/skills/.openspec-target")), false);
+  assert.equal(readFileSync(resolve(target, ".agents/user-owned.txt"), "utf8"), "preserve\n");
 });
 
 test("update rejects an uninitialized project before writing files", () => {

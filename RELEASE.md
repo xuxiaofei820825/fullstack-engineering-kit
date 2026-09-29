@@ -42,14 +42,14 @@ git status --short
 
 推荐让 `.github/workflows/release.yml` 自动创建 Release 和上传资产。不要在推送标签前手动创建同名 Release，否则工作流中的 `gh release create` 会因 Release 已存在而失败。
 
-以下示例发布 `1.3.1`。实际发布时将版本替换为新的语义版本。
+以下示例发布 `1.3.2`。实际发布时将版本替换为新的语义版本。
 
 ### 1. 更新版本
 
 修改根目录 `VERSION`：
 
 ```text
-1.3.1
+1.3.2
 ```
 
 同步更新 `package.json`、`package-lock.json` 和 README 中展示给用户的安装版本，确保 npm 包版本、下载标签、`--version` 参数和 `VERSION` 一致。
@@ -69,18 +69,18 @@ git status --short
 ```bash
 ./scripts/build-release.sh dist
 ls -l dist
-tar -tzf dist/fullstack-engineering-kit-1.3.1.tar.gz
-tar -tzf dist/fullstack-engineering-kit-cli-1.3.1.tgz
+tar -tzf dist/fullstack-engineering-kit-1.3.2.tar.gz
+tar -tzf dist/fullstack-engineering-kit-cli-1.3.2.tgz
 ```
 
 预期生成：
 
 ```text
 dist/bootstrap.sh
-dist/fullstack-engineering-kit-1.3.1.tar.gz
-dist/fullstack-engineering-kit-1.3.1.tar.gz.sha256
-dist/fullstack-engineering-kit-cli-1.3.1.tgz
-dist/fullstack-engineering-kit-cli-1.3.1.tgz.sha256
+dist/fullstack-engineering-kit-1.3.2.tar.gz
+dist/fullstack-engineering-kit-1.3.2.tar.gz.sha256
+dist/fullstack-engineering-kit-cli-1.3.2.tgz
+dist/fullstack-engineering-kit-cli-1.3.2.tgz.sha256
 ```
 
 `dist/` 已被 `.gitignore` 忽略，不需要提交。
@@ -89,7 +89,7 @@ dist/fullstack-engineering-kit-cli-1.3.1.tgz.sha256
 
 ```bash
 git add VERSION package.json package-lock.json README.md RELEASE.md
-git commit -m "chore: release v1.3.1"
+git commit -m "chore: release v1.3.2"
 git push origin main
 ```
 
@@ -100,8 +100,8 @@ git push origin main
 标签必须使用 `v<语义版本>` 格式，并与 `VERSION` 完全一致：
 
 ```bash
-git tag -a v1.3.1 -m "Release v1.3.1"
-git push origin v1.3.1
+git tag -a v1.3.2 -m "Release v1.3.2"
+git push origin v1.3.2
 ```
 
 推送标签后，GitHub Actions 会自动：
@@ -122,14 +122,14 @@ git push origin v1.3.1
 
 ```bash
 curl -fsSIL \
-  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.3.1/bootstrap.sh"
+  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.3.2/bootstrap.sh"
 ```
 
 返回 HTTP 200 后，优先验证终端程序包：
 
 ```bash
 npm install --global \
-  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.3.1/fullstack-engineering-kit-cli-1.3.1.tgz"
+  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.3.2/fullstack-engineering-kit-cli-1.3.2.tgz"
 
 mkdir /path/to/test-project
 fsek init /path/to/test-project --platform codex
@@ -153,16 +153,16 @@ fsek self-update --check
 仅当 GitHub Actions 无法使用时，才采用手动发布。先完成前述验证和本地构建，然后执行：
 
 ```bash
-gh release create v1.3.1 \
-  dist/fullstack-engineering-kit-1.3.1.tar.gz \
-  dist/fullstack-engineering-kit-1.3.1.tar.gz.sha256 \
-  dist/fullstack-engineering-kit-cli-1.3.1.tgz \
-  dist/fullstack-engineering-kit-cli-1.3.1.tgz.sha256 \
+gh release create v1.3.2 \
+  dist/fullstack-engineering-kit-1.3.2.tar.gz \
+  dist/fullstack-engineering-kit-1.3.2.tar.gz.sha256 \
+  dist/fullstack-engineering-kit-cli-1.3.2.tgz \
+  dist/fullstack-engineering-kit-cli-1.3.2.tgz.sha256 \
   dist/bootstrap.sh \
   --repo xuxiaofei820825/fullstack-engineering-kit \
   --verify-tag \
   --generate-notes \
-  --title "v1.3.1"
+  --title "v1.3.2"
 ```
 
 手动发布前必须先将对应标签推送到远端。发布后仍需检查资产 URL，并执行一次实际安装验证。
@@ -179,7 +179,7 @@ gh release create v1.3.1 \
 
 ### 标签版本检查失败
 
-确认标签去掉前缀 `v` 后与 `VERSION` 完全一致。例如 `VERSION` 为 `1.3.1` 时，标签必须为 `v1.3.1`。
+确认标签去掉前缀 `v` 后与 `VERSION` 完全一致。例如 `VERSION` 为 `1.3.2` 时，标签必须为 `v1.3.2`。
 
 ### 不要使用 main 或 latest 安装
 

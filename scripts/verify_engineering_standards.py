@@ -108,7 +108,7 @@ def verify(
 
     commands = (
         ["openspec", "schema", "validate", "engineering-governed"],
-        ["openspec", "validate", "--all", "--strict", "--no-interactive"],
+        ["openspec", "validate", "--changes", "--strict", "--no-interactive"],
         [sys.executable, "-B", ".fullstack-engineering-kit/validate_openspec_designs.py"],
     )
     for command in commands:
