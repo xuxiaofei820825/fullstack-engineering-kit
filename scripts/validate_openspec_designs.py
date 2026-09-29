@@ -128,7 +128,22 @@ def validate_design(path: Path, project_root: Path) -> list[str]:
 
 
 def discover_designs(project_root: Path) -> list[Path]:
-    return sorted((project_root / "openspec" / "changes").glob("*/design.md"))
+    changes_root = project_root / "openspec" / "changes"
+    if not changes_root.is_dir():
+        return []
+    return sorted(
+        entry / "design.md"
+        for entry in changes_root.iterdir()
+        if entry.is_dir()
+        and entry.name != "archive"
+        and not entry.name.startswith(".")
+        and (entry / "design.md").is_file()
+    )
+
+
+def is_archived_design(path: Path, project_root: Path) -> bool:
+    archive_root = (project_root / "openspec" / "changes" / "archive").resolve()
+    return path.resolve().is_relative_to(archive_root)
 
 
 def main() -> int:
@@ -139,7 +154,9 @@ def main() -> int:
     args = parser.parse_args()
 
     project_root = Path(__file__).resolve().parent.parent
-    paths = [path.resolve() for path in args.paths] or discover_designs(project_root)
+    requested_paths = [path.resolve() for path in args.paths]
+    paths = requested_paths or discover_designs(project_root)
+    paths = [path for path in paths if not is_archived_design(path, project_root)]
     failures = 0
 
     for path in paths:

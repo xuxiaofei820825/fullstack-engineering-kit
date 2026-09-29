@@ -59,6 +59,18 @@ class ValidateOpenSpecDesignsTest(unittest.TestCase):
 
         self.assertEqual([], VALIDATOR.validate_design(path, self.root))
 
+    def test_discovers_only_active_change_designs(self) -> None:
+        active = self.root / "openspec/changes/active-change/design.md"
+        archived = self.root / "openspec/changes/archive/2026-09-29-old-change/design.md"
+        hidden = self.root / "openspec/changes/.draft/design.md"
+        for path in (active, archived, hidden):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# Design\n", encoding="utf-8")
+
+        self.assertEqual([active], VALIDATOR.discover_designs(self.root))
+        self.assertFalse(VALIDATOR.is_archived_design(active, self.root))
+        self.assertTrue(VALIDATOR.is_archived_design(archived, self.root))
+
     def test_rejects_placeholders_and_missing_reference(self) -> None:
         path = self.write_design(
             """## 编码规范适用性

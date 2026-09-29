@@ -130,6 +130,18 @@ class InstallEngineeringStandardsTest(unittest.TestCase):
             installed_validation_tests.returncode,
             installed_validation_tests.stderr,
         )
+        archived_design = (
+            self.target
+            / "openspec/changes/archive/2026-09-29-finished-change/design.md"
+        )
+        archived_design.parent.mkdir(parents=True)
+        archived_design.write_text("# Archived design without mappings\n", encoding="utf-8")
+        archived_validation = self.run_script(
+            self.target / ".fullstack-engineering-kit/validate_openspec_designs.py",
+            str(archived_design),
+        )
+        self.assertEqual(0, archived_validation.returncode, archived_validation.stderr)
+        self.assertIn("0 active design(s)", archived_validation.stdout)
 
     def test_update_migrates_legacy_managed_paths(self) -> None:
         installed = self.run_script(INSTALLER, str(self.target))
