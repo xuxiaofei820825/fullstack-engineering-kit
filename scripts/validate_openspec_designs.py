@@ -16,9 +16,16 @@ REQUIRED_SUBSECTIONS = (
     "不适用项",
     "规范偏离",
 )
+SUBSECTION_LABELS = {
+    "变更范围": "change scope",
+    "已加载规范": "loaded standards",
+    "规范落实": "standards implementation",
+    "不适用项": "not-applicable items",
+    "规范偏离": "standards deviations",
+}
+SKILL_PATH = ".agents/skills/full-stack-engineering-practices"
 REFERENCE_PATTERN = re.compile(
-    r"(?:`)?(\.(?:agents|codex|claude)/skills/full-stack-engineering-practices/"
-    r"references/[A-Za-z0-9_./-]+\.md)(?:`)?"
+    rf"(?:`)?({re.escape(SKILL_PATH)}/references/[A-Za-z0-9_./-]+\.md)(?:`)?"
 )
 HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
 OLD_CHAPTER_PATTERN = re.compile(r"第\s*\d+(?:\.\d+)*(?:\s*[-–—]\s*\d+(?:\.\d+)*)?\s*[章节]")
@@ -64,54 +71,58 @@ def validate_design(path: Path, project_root: Path) -> list[str]:
     errors: list[str] = []
     standards_section = extract_section(text, 2, "编码规范适用性")
     if standards_section is None:
-        return ["缺少二级章节“编码规范适用性”"]
+        return ["Missing the required level-2 standards applicability section"]
 
     if "<!--" in standards_section or "-->" in standards_section:
-        errors.append("“编码规范适用性”仍包含模板占位注释")
+        errors.append("The standards applicability section still contains template placeholders")
 
     subsection_content: dict[str, str] = {}
     for title in REQUIRED_SUBSECTIONS:
         content = extract_section(standards_section, 3, title)
         if content is None:
-            errors.append(f"缺少三级章节“{title}”")
+            errors.append(f"Missing level-3 section for {SUBSECTION_LABELS[title]}")
             continue
         cleaned = meaningful_content(content)
         subsection_content[title] = cleaned
         if not cleaned:
-            errors.append(f"三级章节“{title}”没有实际内容")
+            errors.append(f"The {SUBSECTION_LABELS[title]} section has no content")
 
     loaded_content = subsection_content.get("已加载规范", "")
     references = sorted(set(REFERENCE_PATTERN.findall(loaded_content)))
     if not references:
-        errors.append("“已加载规范”未引用任何 full-stack-engineering-practices reference")
+        errors.append("The loaded standards section does not reference any full-stack-engineering-practices file")
     for reference in references:
         if not (project_root / reference).is_file():
-            errors.append(f"引用的规范文件不存在：{reference}")
+            errors.append(f"Referenced standards file does not exist: {reference}")
 
     loaded_rows = table_data_rows(loaded_content, 3)
     if not loaded_rows or any(not all(row) for row in loaded_rows):
-        errors.append("“已加载规范”必须至少包含一行三列均非空的规范映射")
+        errors.append("The loaded standards section must contain at least one mapping row with three non-empty columns")
     for row in loaded_rows:
         reference_cell = row[0]
         if not REFERENCE_PATTERN.fullmatch(reference_cell):
-            errors.append(f"“已加载规范”的规范文件不是有效 reference 路径：{reference_cell}")
+            errors.append(f"Invalid reference path in the loaded standards section: {reference_cell}")
 
     implementation_rows = table_data_rows(subsection_content.get("规范落实", ""), 3)
     if not implementation_rows or any(not all(row) for row in implementation_rows):
-        errors.append("“规范落实”必须至少包含一行三列均非空的约束、设计决策和验证方式映射")
+        errors.append("The standards implementation section must contain at least one three-column mapping for constraint, design decision, and verification")
 
     if re.search(r"coding-standards\.md", standards_section, re.IGNORECASE):
-        errors.append("不得在规范映射中引用原始 coding-standards.md")
+        errors.append("Standards mappings must not reference the original coding-standards.md")
     if OLD_CHAPTER_PATTERN.search(standards_section):
-        errors.append("不得在规范映射中使用原始文档章节号")
+        errors.append("Standards mappings must not use chapter numbers from the original document")
     if "遵循编码规范" in standards_section:
-        errors.append("不得使用笼统的“遵循编码规范”代替规范映射")
+        errors.append("Do not replace a standards mapping with a generic compliance statement")
 
     deviation = subsection_content.get("规范偏离", "").strip().rstrip("。")
     if deviation and deviation != "无":
-        for keyword in ("风险", "替代措施", "审批"):
+        for keyword, label in (
+            ("风险", "risk"),
+            ("替代措施", "mitigation"),
+            ("审批", "approval"),
+        ):
             if keyword not in deviation:
-                errors.append(f"存在规范偏离时必须说明{keyword}")
+                errors.append(f"Standards deviations must describe {label}")
 
     return errors
 
@@ -122,9 +133,9 @@ def discover_designs(project_root: Path) -> list[Path]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="校验活动 OpenSpec design.md 中的编码规范映射"
+        description="Validate engineering standards mappings in active OpenSpec design.md files"
     )
-    parser.add_argument("paths", nargs="*", type=Path, help="可选的 design.md 路径")
+    parser.add_argument("paths", nargs="*", type=Path, help="optional design.md paths")
     args = parser.parse_args()
 
     project_root = Path(__file__).resolve().parent.parent
@@ -133,7 +144,7 @@ def main() -> int:
 
     for path in paths:
         if not path.is_file():
-            print(f"ERROR {path}: 文件不存在", file=sys.stderr)
+            print(f"ERROR {path}: File does not exist", file=sys.stderr)
             failures += 1
             continue
         errors = validate_design(path, project_root)
@@ -146,10 +157,10 @@ def main() -> int:
         failures += len(errors)
 
     if failures:
-        print(f"OpenSpec design 校验失败：{failures} 个问题", file=sys.stderr)
+        print(f"OpenSpec design validation failed: {failures} issue(s)", file=sys.stderr)
         return 1
 
-    print(f"OpenSpec design 校验通过：{len(paths)} 个活动设计")
+    print(f"OpenSpec design validation passed: {len(paths)} active design(s)")
     return 0
 
 

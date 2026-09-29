@@ -70,4 +70,4 @@ jobs:
             "dist/bootstrap.sh" \
             --verify-tag \
             --generate-notes \
-            --title "Fullstack Engineering Kit ${version}"
+            --title "v${version}"

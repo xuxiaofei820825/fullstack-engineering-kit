@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import shutil
 import stat
 import subprocess
 import sys
@@ -68,12 +70,12 @@ class InstallEngineeringStandardsTest(unittest.TestCase):
         second = self.run_script(INSTALLER, str(self.target))
 
         self.assertEqual(0, first.returncode, first.stderr)
-        self.assertEqual(
-            (REPOSITORY_ROOT / "openspec/config.yaml").read_bytes(),
-            (self.target / "openspec/config.yaml").read_bytes(),
+        self.assertIn(
+            ".codex/skills/full-stack-engineering-practices",
+            (self.target / "openspec/config.yaml").read_text(encoding="utf-8"),
         )
         self.assertEqual(0, second.returncode, second.stderr)
-        self.assertIn("无需更新", second.stdout)
+        self.assertIn("already up to date", second.stdout)
 
     def test_installs_platform_specific_skill_without_touching_project_scripts(self) -> None:
         project_script = self.target / "scripts/validate-engineering-standards.sh"
@@ -105,9 +107,42 @@ class InstallEngineeringStandardsTest(unittest.TestCase):
             (self.target / ".claude/skills/full-stack-engineering-practices/SKILL.md").is_file()
         )
 
+    def test_supports_opencode_platform(self) -> None:
+        result = self.run_script(
+            INSTALLER,
+            str(self.target),
+            "--platform",
+            "opencode",
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertTrue(
+            (self.target / ".opencode/skills/full-stack-engineering-practices/SKILL.md").is_file()
+        )
+        self.assertFalse((self.target / ".agents").exists())
+        schema = self.target / "openspec/schemas/engineering-governed/schema.yaml"
+        self.assertIn(".opencode/skills/full-stack-engineering-practices", schema.read_text())
+        installed_validation_tests = self.run_script(
+            self.target / ".fullstack-engineering-kit/tests/test_validate_openspec_designs.py"
+        )
+        self.assertEqual(
+            0,
+            installed_validation_tests.returncode,
+            installed_validation_tests.stderr,
+        )
+
     def test_update_migrates_legacy_managed_paths(self) -> None:
         installed = self.run_script(INSTALLER, str(self.target))
         self.assertEqual(0, installed.returncode, installed.stderr)
+        codex_skill = self.target / ".codex/skills/full-stack-engineering-practices"
+        legacy_skill = self.target / ".agents/skills/full-stack-engineering-practices"
+        legacy_skill.parent.mkdir(parents=True)
+        shutil.move(codex_skill, legacy_skill)
+        metadata_path = self.target / ".fullstack-engineering-kit/installation.json"
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        metadata["platform"] = "agents"
+        metadata["skillPath"] = ".agents/skills/full-stack-engineering-practices"
+        metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
         legacy_script = self.target / "scripts/validate-engineering-standards.sh"
         legacy_script.parent.mkdir(parents=True)
         legacy_script.write_text("legacy\n", encoding="utf-8")
@@ -161,7 +196,7 @@ class InstallEngineeringStandardsTest(unittest.TestCase):
 
         legacy_verification = self.run_script(VERIFIER, str(self.target), "--files-only")
         self.assertEqual(1, legacy_verification.returncode)
-        self.assertIn("检测到旧版标记", legacy_verification.stderr)
+        self.assertIn("Legacy marker", legacy_verification.stderr)
 
         updated = self.run_script(INSTALLER, str(self.target), "--update")
 
@@ -185,7 +220,7 @@ class InstallEngineeringStandardsTest(unittest.TestCase):
         refused = self.run_script(INSTALLER, str(self.target))
 
         self.assertEqual(2, refused.returncode)
-        self.assertIn("未写入任何文件", refused.stderr)
+        self.assertIn("no files were written", refused.stderr)
         self.assertIn("local edit", template.read_text(encoding="utf-8"))
 
         updated = self.run_script(INSTALLER, str(self.target), "--update")
@@ -210,7 +245,7 @@ class InstallEngineeringStandardsTest(unittest.TestCase):
         result = self.run_script(INSTALLER, str(self.target))
 
         self.assertEqual(2, result.returncode)
-        self.assertIn("多个顶层 schema", result.stderr)
+        self.assertIn("multiple top-level schema", result.stderr)
         self.assertFalse((self.target / ".agents").exists())
 
     def test_preserves_crlf_and_yaml_document_marker(self) -> None:

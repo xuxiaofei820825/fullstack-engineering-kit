@@ -81,8 +81,8 @@ class ValidateOpenSpecDesignsTest(unittest.TestCase):
 
         errors = VALIDATOR.validate_design(path, self.root)
 
-        self.assertTrue(any("占位注释" in error for error in errors))
-        self.assertTrue(any("未引用任何" in error for error in errors))
+        self.assertTrue(any("template placeholders" in error for error in errors))
+        self.assertTrue(any("does not reference any" in error for error in errors))
 
     def test_rejects_invalid_deviation(self) -> None:
         path = self.write_design(
@@ -106,9 +106,9 @@ class ValidateOpenSpecDesignsTest(unittest.TestCase):
 
         errors = VALIDATOR.validate_design(path, self.root)
 
-        self.assertTrue(any("风险" in error for error in errors))
-        self.assertTrue(any("替代措施" in error for error in errors))
-        self.assertTrue(any("审批" in error for error in errors))
+        self.assertTrue(any("risk" in error for error in errors))
+        self.assertTrue(any("mitigation" in error for error in errors))
+        self.assertTrue(any("approval" in error for error in errors))
 
     def test_rejects_empty_mapping_tables(self) -> None:
         path = self.write_design(
@@ -136,8 +136,8 @@ class ValidateOpenSpecDesignsTest(unittest.TestCase):
 
         errors = VALIDATOR.validate_design(path, self.root)
 
-        self.assertTrue(any("已加载规范" in error and "一行" in error for error in errors))
-        self.assertTrue(any("规范落实" in error and "一行" in error for error in errors))
+        self.assertTrue(any("loaded standards" in error and "mapping row" in error for error in errors))
+        self.assertTrue(any("standards implementation" in error and "three-column" in error for error in errors))
 
     def test_rejects_non_reference_path_in_loaded_standards_table(self) -> None:
         path = self.write_design(
@@ -165,7 +165,7 @@ class ValidateOpenSpecDesignsTest(unittest.TestCase):
 
         errors = VALIDATOR.validate_design(path, self.root)
 
-        self.assertTrue(any("不是有效 reference 路径" in error for error in errors))
+        self.assertTrue(any("Invalid reference path" in error for error in errors))
 
 
 if __name__ == "__main__":

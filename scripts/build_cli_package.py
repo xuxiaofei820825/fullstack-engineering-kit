@@ -23,7 +23,7 @@ def build(output_dir: Path) -> tuple[Path, Path]:
     package = json.loads((root / "package.json").read_text(encoding="utf-8"))
     if package.get("version") != version:
         raise InstallationError(
-            f"package.json 版本 {package.get('version')!r} 与 VERSION {version!r} 不一致"
+            f"package.json version {package.get('version')!r} does not match VERSION {version!r}"
         )
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -38,12 +38,12 @@ def build(output_dir: Path) -> tuple[Path, Path]:
             text=True,
         )
     if result.returncode != 0:
-        raise InstallationError(f"npm CLI 包构建失败：\n{result.stderr.strip()}")
+        raise InstallationError(f"npm CLI package build failed:\n{result.stderr.strip()}")
     try:
         npm_output = json.loads(result.stdout)
         generated = output_dir / npm_output[0]["filename"]
     except (IndexError, KeyError, json.JSONDecodeError) as error:
-        raise InstallationError(f"无法解析 npm pack 输出：{error}") from error
+        raise InstallationError(f"Unable to parse npm pack output: {error}") from error
 
     archive = output_dir / PACKAGE_FILENAME.format(version=version)
     if archive.exists():
@@ -56,13 +56,13 @@ def build(output_dir: Path) -> tuple[Path, Path]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="构建 Fullstack Engineering Kit npm CLI 包")
+    parser = argparse.ArgumentParser(description="Build the Fullstack Engineering Kit npm CLI package")
     parser.add_argument(
         "output_dir",
         nargs="?",
         type=Path,
         default=Path("dist"),
-        help="产物目录，默认 dist",
+        help="output directory (default: dist)",
     )
     args = parser.parse_args()
     try:

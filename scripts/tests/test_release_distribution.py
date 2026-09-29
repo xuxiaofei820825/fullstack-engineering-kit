@@ -28,6 +28,14 @@ class ReleaseDistributionTest(unittest.TestCase):
             text=True,
         )
 
+    def test_release_title_matches_the_version_tag(self) -> None:
+        workflow = (REPOSITORY_ROOT / ".github/workflows/release.yml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('--title "v${version}"', workflow)
+        self.assertNotIn('--title "Fullstack Engineering Kit ${version}"', workflow)
+
     def test_release_archive_is_deterministic_and_self_contained(self) -> None:
         with tempfile.TemporaryDirectory() as first_dir, tempfile.TemporaryDirectory() as second_dir:
             first = Path(first_dir)

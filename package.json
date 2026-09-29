@@ -1,6 +1,6 @@
 {
   "name": "@xuxiaofei820825/fullstack-engineering-kit",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Initialize and update the Fullstack Engineering Kit in OpenSpec projects.",
   "type": "module",
   "bin": {

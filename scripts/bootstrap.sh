@@ -9,10 +9,10 @@ version=""
 update=false
 dry_run=false
 use_gh=false
-platform="agents"
+platform="codex"
 
 usage() {
-  echo "Usage: bootstrap.sh --repository OWNER/REPO --version VERSION [--target DIRECTORY] [--platform agents|codex|claude] [--use-gh] [--update] [--dry-run]" >&2
+  echo "Usage: bootstrap.sh --repository OWNER/REPO --version VERSION [--target DIRECTORY] [--platform codex|claude|opencode] [--use-gh] [--update] [--dry-run]" >&2
 }
 
 while (($#)); do
@@ -50,7 +50,7 @@ while (($#)); do
       exit 0
       ;;
     *)
-      echo "ERROR: 未知参数：$1" >&2
+      echo "ERROR: Unknown option: $1" >&2
       usage
       exit 2
       ;;
@@ -58,32 +58,32 @@ while (($#)); do
 done
 
 if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "ERROR: --version 必须是明确的语义版本，例如 1.0.0" >&2
+  echo "ERROR: --version must be an explicit semantic version, for example 1.0.0" >&2
   exit 2
 fi
 if [[ ! "$repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
-  echo "ERROR: 必须通过 --repository 或 FULLSTACK_ENGINEERING_KIT_GITHUB_REPOSITORY 提供 OWNER/REPO" >&2
+  echo "ERROR: Provide OWNER/REPO through --repository or FULLSTACK_ENGINEERING_KIT_GITHUB_REPOSITORY" >&2
   exit 2
 fi
 if [[ ! -d "$target" ]]; then
-  echo "ERROR: 目标项目目录不存在：$target" >&2
+  echo "ERROR: Target project directory does not exist: $target" >&2
   exit 2
 fi
-if [[ "$platform" != "agents" && "$platform" != "codex" && "$platform" != "claude" ]]; then
-  echo "ERROR: --platform 必须是 agents、codex 或 claude" >&2
+if [[ "$platform" != "codex" && "$platform" != "claude" && "$platform" != "opencode" ]]; then
+  echo "ERROR: --platform must be codex, claude, or opencode" >&2
   exit 2
 fi
 if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then
-  echo "ERROR: 安装编码规范需要 Python 3.10 或更高版本" >&2
+  echo "ERROR: Python 3.10 or later is required to install the engineering standards" >&2
   exit 2
 fi
 if [[ "$use_gh" == true ]]; then
   if ! command -v gh >/dev/null 2>&1; then
-    echo "ERROR: --use-gh 需要已安装的 GitHub CLI" >&2
+    echo "ERROR: --use-gh requires the GitHub CLI" >&2
     exit 2
   fi
   if [[ -z "${GH_TOKEN:-}" && -z "${GITHUB_TOKEN:-}" ]] && ! gh auth status >/dev/null 2>&1; then
-    echo "ERROR: GitHub CLI 尚未认证，请执行 gh auth login 或设置 GH_TOKEN" >&2
+    echo "ERROR: GitHub CLI is not authenticated; run gh auth login or set GH_TOKEN" >&2
     exit 2
   fi
 fi
@@ -118,11 +118,11 @@ if command -v sha256sum >/dev/null 2>&1; then
 elif command -v shasum >/dev/null 2>&1; then
   actual_checksum="$(shasum -a 256 "$archive_path" | awk '{ print $1 }')"
 else
-  echo "ERROR: 找不到 sha256sum 或 shasum，无法校验发布包" >&2
+  echo "ERROR: sha256sum or shasum is required to verify the release archive" >&2
   exit 1
 fi
 if [[ ! "$expected_checksum" =~ ^[0-9a-fA-F]{64}$ || "$actual_checksum" != "$expected_checksum" ]]; then
-  echo "ERROR: 发布包 SHA-256 校验失败" >&2
+  echo "ERROR: Release archive SHA-256 verification failed" >&2
   exit 1
 fi
 
@@ -148,7 +148,7 @@ with tarfile.open(archive_path, "r:gz") as archive:
             or any(part in {"", ".", ".."} for part in path.parts)
             or path.as_posix() != member.name.rstrip("/")
         ):
-            raise SystemExit(f"ERROR: 发布包包含不安全的路径或文件类型：{member.name}")
+            raise SystemExit(f"ERROR: Release archive contains an unsafe path or file type: {member.name}")
     for member in members:
         target = destination.joinpath(*PurePosixPath(member.name).parts)
         if member.isdir():
@@ -157,14 +157,14 @@ with tarfile.open(archive_path, "r:gz") as archive:
         target.parent.mkdir(parents=True, exist_ok=True)
         source = archive.extractfile(member)
         if source is None:
-            raise SystemExit(f"ERROR: 无法读取发布包文件：{member.name}")
+            raise SystemExit(f"ERROR: Unable to read a release archive file: {member.name}")
         with source, target.open("wb") as output:
             shutil.copyfileobj(source, output)
         os.chmod(target, member.mode & 0o777)
 PY
 installer="$temporary_dir/${package_name}-${version}/scripts/install.sh"
 if [[ ! -x "$installer" ]]; then
-  echo "ERROR: 发布包中缺少可执行安装器" >&2
+  echo "ERROR: Release archive does not contain an executable installer" >&2
   exit 1
 fi
 

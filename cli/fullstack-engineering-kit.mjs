@@ -21,9 +21,9 @@ const bundledOpenSpec = resolve(
 );
 const bundleVersion = readFileSync(resolve(packageRoot, "VERSION"), "utf8").trim();
 const platforms = [
-  { id: "agents", label: "Shared .agents skills", directory: ".agents" },
   { id: "codex", label: "Codex", directory: ".codex" },
   { id: "claude", label: "Claude Code", directory: ".claude" },
+  { id: "opencode", label: "OpenCode", directory: ".opencode" },
 ];
 
 class CliError extends Error {
@@ -55,17 +55,17 @@ function parseArguments(argv) {
     const token = tokens[index];
     if (token === "--platform" || token === "-p") {
       const value = tokens[index + 1];
-      if (!value) throw new CliError(`${token} 需要平台名称`);
+      if (!value) throw new CliError(`${token} requires a platform name.`);
       options.platform = value;
       index += 1;
     } else if (token === "--repository") {
       const value = tokens[index + 1];
-      if (!value) throw new CliError("--repository 需要 OWNER/REPO");
+      if (!value) throw new CliError("--repository requires OWNER/REPO.");
       options.repository = value;
       index += 1;
     } else if (token === "--version" && command === "self-update") {
       const value = tokens[index + 1];
-      if (!value) throw new CliError("--version 需要语义版本号");
+      if (!value) throw new CliError("--version requires a semantic version.");
       options.targetVersion = value;
       index += 1;
     } else if (token === "--check") {
@@ -87,12 +87,12 @@ function parseArguments(argv) {
     } else if (token === "--version" || token === "-V") {
       options.command = "version";
     } else if (token.startsWith("-")) {
-      throw new CliError(`未知参数：${token}`);
+      throw new CliError(`Unknown option: ${token}`);
     } else if (!targetAssigned) {
       options.target = token;
       targetAssigned = true;
     } else {
-      throw new CliError(`多余参数：${token}`);
+      throw new CliError(`Unexpected argument: ${token}`);
     }
   }
   return options;
@@ -137,7 +137,7 @@ function findPython() {
     if (!result.error && result.status === 0) return command;
   }
   throw new CliError(
-    "需要 Python 3.10 或更高版本。可通过 FSEK_PYTHON 指定解释器路径。",
+    "Python 3.10 or later is required. Set FSEK_PYTHON to specify the interpreter.",
   );
 }
 
@@ -149,7 +149,7 @@ function run(command, args, options = {}) {
     stdio: options.capture ? "pipe" : "inherit",
   });
   if (result.error) {
-    throw new CliError(`无法执行 ${command}：${result.error.message}`, 1);
+    throw new CliError(`Unable to run ${command}: ${result.error.message}`, 1);
   }
   return result;
 }
@@ -159,6 +159,9 @@ function readInstallation(target) {
   if (!existsSync(path)) return undefined;
   try {
     const metadata = JSON.parse(readFileSync(path, "utf8"));
+    if (metadata.platform === "agents") {
+      return { ...metadata, platform: "codex", migratedFrom: "agents" };
+    }
     return platforms.some(({ id }) => id === metadata.platform) ? metadata : undefined;
   } catch {
     return undefined;
@@ -172,7 +175,7 @@ function detectedPlatforms(target) {
 async function selectPlatform(target, requested, assumeYes, allowInstalled) {
   if (requested) {
     if (!platforms.some(({ id }) => id === requested)) {
-      throw new CliError(`不支持的平台：${requested}。可选值：agents、codex、claude`);
+      throw new CliError(`Unsupported platform: ${requested}. Choose codex, claude, or opencode.`);
     }
     return requested;
   }
@@ -180,11 +183,11 @@ async function selectPlatform(target, requested, assumeYes, allowInstalled) {
   const installed = allowInstalled ? readInstallation(target)?.platform : undefined;
   if (installed) return installed;
   const detected = detectedPlatforms(target);
-  const preferred = detected[0]?.id ?? "agents";
+  const preferred = detected[0]?.id ?? "codex";
   if (assumeYes) return preferred;
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     throw new CliError(
-      "非交互环境必须指定 --platform agents|codex|claude，或使用 --yes 接受自动检测结果。",
+      "Non-interactive environments require --platform codex|claude|opencode, or --yes to accept automatic detection.",
     );
   }
 
@@ -222,7 +225,7 @@ async function selectPlatform(target, requested, assumeYes, allowInstalled) {
     const onKeypress = (_character, key) => {
       if (key?.ctrl && key.name === "c") {
         finish();
-        rejectSelection(new CliError("已取消。", 130));
+        rejectSelection(new CliError("Cancelled.", 130));
       } else if (key?.name === "up") {
         selectedIndex = (selectedIndex - 1 + platforms.length) % platforms.length;
         render(true);
@@ -243,7 +246,7 @@ function findOpenSpec() {
   const candidates = existsSync(bundledOpenSpec) ? [bundledOpenSpec, "openspec"] : ["openspec"];
   const command = candidates.find((candidate) => commandAvailable(candidate));
   if (command) return command;
-  throw new CliError("找不到 OpenSpec 1.9.0，请重新安装 Fullstack Engineering Kit CLI。");
+  throw new CliError("OpenSpec 1.9.0 was not found. Reinstall the Fullstack Engineering Kit CLI.");
 }
 
 function installBundle(python, target, platform, options) {
@@ -251,17 +254,17 @@ function installBundle(python, target, platform, options) {
   if (options.force || options.command === "update") args.push("--update");
   if (options.dryRun) args.push("--dry-run");
   const result = run(python, args);
-  if (result.status !== 0) throw new CliError("规范套件安装失败。", result.status ?? 1);
+  if (result.status !== 0) throw new CliError("The engineering kit installation failed.", result.status ?? 1);
 }
 
 async function initialize(options, colors) {
   const target = resolve(options.target);
   if (options.dryRun && !existsSync(target)) {
-    throw new CliError(`dry-run 要求目标项目目录已经存在：${target}`);
+    throw new CliError(`Dry run requires an existing target directory: ${target}`);
   }
   mkdirSync(target, { recursive: true });
   if (readInstallation(target) && !options.force) {
-    throw new CliError("该项目已经初始化。请使用 update，或使用 init --force 重新安装。");
+    throw new CliError("This project is already initialized. Use update, or init --force to reinstall.");
   }
   const python = findPython();
   printWelcome(colors);
@@ -277,7 +280,7 @@ async function initialize(options, colors) {
     const arguments_ = ["init", target, "--tools", platform, "--no-animation"];
     if (options.force) arguments_.push("--force");
     const result = run(openSpec, arguments_);
-    if (result.status !== 0) throw new CliError("OpenSpec 初始化失败。", result.status ?? 1);
+    if (result.status !== 0) throw new CliError("OpenSpec initialization failed.", result.status ?? 1);
   }
   installBundle(python, target, platform, options);
   if (!options.dryRun) {
@@ -289,7 +292,7 @@ async function initialize(options, colors) {
 
 async function update(options, colors) {
   const target = resolve(options.target);
-  if (!existsSync(target)) throw new CliError(`目标项目目录不存在：${target}`);
+  if (!existsSync(target)) throw new CliError(`Target project directory does not exist: ${target}`);
   const python = findPython();
   const platform = await selectPlatform(target, options.platform, options.yes, true);
   printWelcome(colors);
@@ -297,7 +300,7 @@ async function update(options, colors) {
   let openSpec;
   if (!options.dryRun && !options.skipOpenSpec) {
     if (!existsSync(resolve(target, "openspec/config.yaml"))) {
-      throw new CliError("目标项目尚未初始化 OpenSpec，请先运行 fsek init。", 1);
+      throw new CliError("OpenSpec is not initialized in the target project. Run fsek init first.", 1);
     }
     openSpec = findOpenSpec();
   }
@@ -305,7 +308,7 @@ async function update(options, colors) {
 
   if (openSpec) {
     const result = run(openSpec, ["update", target]);
-    if (result.status !== 0) throw new CliError("OpenSpec 指令更新失败。", result.status ?? 1);
+    if (result.status !== 0) throw new CliError("OpenSpec instruction update failed.", result.status ?? 1);
   }
   if (!options.dryRun) process.stdout.write(colors.green("\nUpdate complete.\n"));
 }
@@ -321,7 +324,7 @@ function verify(options) {
     ? { ...process.env, PATH: `${dirname(openSpec)}${delimiter}${process.env.PATH ?? ""}` }
     : process.env;
   const result = run(python, args, { env: environment });
-  if (result.status !== 0) throw new CliError("验证失败。", result.status ?? 1);
+  if (result.status !== 0) throw new CliError("Verification failed.", result.status ?? 1);
 }
 
 function doctor(options, colors) {
@@ -345,12 +348,12 @@ function doctor(options, colors) {
       failed = true;
     }
   }
-  if (failed) throw new CliError("环境或安装状态存在问题。", 1);
+  if (failed) throw new CliError("The environment or installation has problems.", 1);
 }
 
 function normalizedVersion(value) {
   const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(value);
-  if (!match) throw new CliError(`无效语义版本：${value}`);
+  if (!match) throw new CliError(`Invalid semantic version: ${value}`);
   return match.slice(1).map(Number);
 }
 
@@ -375,10 +378,10 @@ async function githubRequest(url, accept = "application/vnd.github+json") {
   try {
     response = await fetch(url, { headers, redirect: "follow" });
   } catch (error) {
-    throw new CliError(`无法访问 GitHub Release：${error.message}`, 1);
+    throw new CliError(`Unable to access the GitHub Release: ${error.message}`, 1);
   }
   if (!response.ok) {
-    throw new CliError(`GitHub Release 请求失败：HTTP ${response.status}`, 1);
+    throw new CliError(`GitHub Release request failed: HTTP ${response.status}`, 1);
   }
   return response;
 }
@@ -386,14 +389,14 @@ async function githubRequest(url, accept = "application/vnd.github+json") {
 async function downloadAsset(asset, fixtureMode) {
   if (fixtureMode && asset.fixture_path) return readFileSync(asset.fixture_path);
   const downloadUrl = asset.url || asset.browser_download_url;
-  if (!downloadUrl) throw new CliError(`Release asset ${asset.name} 缺少下载地址。`, 1);
+  if (!downloadUrl) throw new CliError(`Release asset ${asset.name} has no download URL.`, 1);
   const response = await githubRequest(downloadUrl, "application/octet-stream");
   return Buffer.from(await response.arrayBuffer());
 }
 
 async function selfUpdate(options, colors) {
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(options.repository)) {
-    throw new CliError("--repository 必须使用 OWNER/REPO 格式");
+    throw new CliError("--repository must use the OWNER/REPO format.");
   }
   const apiBase = (process.env.FSEK_GITHUB_API_URL || "https://api.github.com").replace(/\/$/, "");
   const releasePath = options.targetVersion
@@ -406,7 +409,7 @@ async function selfUpdate(options, colors) {
     try {
       release = JSON.parse(readFileSync(releaseFixture, "utf8"));
     } catch (error) {
-      throw new CliError(`无法读取 Release 测试数据：${error.message}`, 1);
+      throw new CliError(`Unable to read Release fixture data: ${error.message}`, 1);
     }
   } else {
     const releaseResponse = await githubRequest(
@@ -420,7 +423,7 @@ async function selfUpdate(options, colors) {
     && normalizedVersion(options.targetVersion).join(".") !== targetVersion
   ) {
     throw new CliError(
-      `请求版本 ${options.targetVersion}，但 Release 返回的是 ${release.tag_name}。`,
+      `Requested ${options.targetVersion}, but the Release returned ${release.tag_name}.`,
       1,
     );
   }
@@ -442,7 +445,7 @@ async function selfUpdate(options, colors) {
   }
   if (comparison < 0 && !options.force) {
     throw new CliError(
-      `目标版本 ${targetVersion} 低于当前版本 ${packageJson.version}；如需降级请使用 --force。`,
+      `Target version ${targetVersion} is older than the current version ${packageJson.version}. Use --force to downgrade.`,
     );
   }
   const archiveName = `fullstack-engineering-kit-cli-${targetVersion}.tgz`;
@@ -451,7 +454,7 @@ async function selfUpdate(options, colors) {
   const archiveAsset = assets.find(({ name }) => name === archiveName);
   const checksumAsset = assets.find(({ name }) => name === checksumName);
   if (!archiveAsset || !checksumAsset) {
-    throw new CliError(`Release v${targetVersion} 缺少 ${archiveName} 或校验文件。`, 1);
+    throw new CliError(`Release v${targetVersion} is missing ${archiveName} or its checksum file.`, 1);
   }
 
   process.stdout.write(`Downloading ${archiveName}...\n`);
@@ -464,10 +467,10 @@ async function selfUpdate(options, colors) {
     `^([0-9a-fA-F]{64})\\s+${archiveName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
     "m",
   ).exec(checksumText.trim());
-  if (!checksumMatch) throw new CliError("Release SHA-256 文件格式无效。", 1);
+  if (!checksumMatch) throw new CliError("The Release SHA-256 file has an invalid format.", 1);
   const actualChecksum = createHash("sha256").update(archive).digest("hex");
   if (actualChecksum.toLowerCase() !== checksumMatch[1].toLowerCase()) {
-    throw new CliError("CLI 包 SHA-256 校验失败，已停止升级。", 1);
+    throw new CliError("CLI package SHA-256 verification failed. The update was stopped.", 1);
   }
 
   const temporaryDirectory = mkdtempSync(resolve(tmpdir(), "fullstack-engineering-kit-update-"));
@@ -476,7 +479,7 @@ async function selfUpdate(options, colors) {
     writeFileSync(archivePath, archive);
     const npm = process.env.FSEK_NPM || "npm";
     const result = run(npm, ["install", "--global", archivePath]);
-    if (result.status !== 0) throw new CliError("npm 全局升级失败。", result.status ?? 1);
+    if (result.status !== 0) throw new CliError("The global npm update failed.", result.status ?? 1);
   } finally {
     rmSync(temporaryDirectory, { recursive: true, force: true });
   }
@@ -493,25 +496,25 @@ Usage:
   fsek <command> [target] [options]
 
 Commands:
-  init       初始化 OpenSpec 和工程规范
-  update     升级项目中的工程规范并更新 OpenSpec 指令
-  self-update 检查并升级全局 CLI
-  verify     验证安装、schema 和 OpenSpec 产物
-  doctor     检查运行环境和安装状态
-  version    显示 CLI 与规范套件版本
+  init        Initialize OpenSpec and the engineering standards
+  update      Update the engineering standards and OpenSpec instructions
+  self-update Check and update the globally installed CLI
+  verify      Verify the installation, schema, and OpenSpec artifacts
+  doctor      Check the environment and installation status
+  version     Show the CLI and bundled kit versions
 
 Options:
-  -p, --platform <name>  agents、codex 或 claude
-  -y, --yes             接受检测到的平台或默认值
-      --force           初始化时替换已有受管内容
-      --dry-run         只显示将发生的安装变更
-      --files-only      verify 只检查文件和配置
-      --skip-openspec   不执行 openspec init/update
-      --check           self-update 只检查可用版本
-      --version <ver>   self-update 安装指定版本
-      --repository <r>  Release 仓库，默认 xuxiaofei820825/fullstack-engineering-kit
-      --no-color        禁用 ANSI 颜色
-  -h, --help            显示帮助
+  -p, --platform <name>  codex, claude, or opencode
+  -y, --yes              Accept the detected platform or default
+      --force            Replace managed content during initialization
+      --dry-run          Show installation changes without writing files
+      --files-only       Verify files and configuration only
+      --skip-openspec    Skip openspec init/update
+      --check            Check for a self-update without installing it
+      --version <ver>    Install a specific CLI version during self-update
+      --repository <r>   Release repository; defaults to xuxiaofei820825/fullstack-engineering-kit
+      --no-color         Disable ANSI colors
+  -h, --help             Show help
 `);
 }
 
@@ -543,7 +546,7 @@ async function main() {
       printHelp();
       break;
     default:
-      throw new CliError(`未知命令：${options.command}\n运行 fsek --help 查看可用命令。`);
+      throw new CliError(`Unknown command: ${options.command}\nRun fsek --help to see available commands.`);
   }
 }
 

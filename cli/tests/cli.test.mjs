@@ -60,6 +60,7 @@ test("prints help and version", () => {
   assert.equal(help.status, 0, help.stderr);
   assert.match(help.stdout, /init/);
   assert.match(help.stdout, /update/);
+  assert.doesNotMatch(help.stdout, /[\u3400-\u9FFF]/u);
 
   const versionResult = run("version");
   assert.equal(versionResult.status, 0, versionResult.stderr);
@@ -104,7 +105,7 @@ test("update rejects an uninitialized project before writing files", () => {
   const updated = run("update", target, "--platform", "codex");
 
   assert.equal(updated.status, 1);
-  assert.match(updated.stderr, /尚未初始化 OpenSpec/);
+  assert.match(updated.stderr, /OpenSpec is not initialized/);
   assert.equal(existsSync(resolve(target, ".fullstack-engineering-kit-version")), false);
 });
 
@@ -114,20 +115,34 @@ test("non-interactive init requires an explicit or accepted platform", () => {
   const result = run("init", target, "--skip-openspec");
 
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /非交互环境必须指定 --platform/);
+  assert.match(result.stderr, /Non-interactive environments require --platform/);
+});
+
+test("init rejects the legacy agents platform", () => {
+  const target = mkdtempSync(resolve(tmpdir(), "fsek-cli-agents-"));
+
+  const result = run("init", target, "--platform", "agents", "--skip-openspec");
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /Choose codex, claude, or opencode/);
+  assert.equal(existsSync(resolve(target, ".agents")), false);
 });
 
 test("verify delegates to the bundle verifier", () => {
   const target = mkdtempSync(resolve(tmpdir(), "fsek-cli-verify-"));
   assert.equal(
-    run("init", target, "--platform", "agents", "--skip-openspec").status,
+    run("init", target, "--platform", "opencode", "--skip-openspec").status,
     0,
   );
 
   const verified = run("verify", target, "--files-only");
 
   assert.equal(verified.status, 0, verified.stderr);
-  assert.match(verified.stdout, /安装验证通过/);
+  assert.match(verified.stdout, /installation verified/);
+  assert.equal(
+    existsSync(resolve(target, ".opencode/skills/full-stack-engineering-practices/SKILL.md")),
+    true,
+  );
 });
 
 test("self-update verifies the release checksum before invoking npm", async () => {
@@ -169,7 +184,7 @@ test("self-update refuses a package whose checksum does not match", async () => 
   );
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /SHA-256 校验失败/);
+  assert.match(result.stderr, /SHA-256 verification failed/);
 });
 
 test("self-update can check a specific version without invoking npm", async () => {
@@ -200,5 +215,5 @@ test("self-update refuses downgrades unless force is explicit", async () => {
   );
 
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /如需降级请使用 --force/);
+  assert.match(result.stderr, /Use --force to downgrade/);
 });

@@ -34,7 +34,7 @@ def package_files(root: Path) -> list[Path]:
     for relative in PACKAGE_PATHS:
         source = root / relative
         if not source.exists():
-            raise FileNotFoundError(f"发布包缺少必需路径：{relative}")
+            raise FileNotFoundError(f"Release package is missing a required path: {relative}")
         if source.is_file():
             files.add(relative)
             continue
@@ -86,13 +86,13 @@ def build(output_dir: Path) -> tuple[Path, Path, Path]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="构建编码规范 GitHub Release 资产")
+    parser = argparse.ArgumentParser(description="Build the engineering kit GitHub Release assets")
     parser.add_argument(
         "output_dir",
         nargs="?",
         type=Path,
         default=Path("dist"),
-        help="产物目录，默认 dist",
+        help="output directory (default: dist)",
     )
     args = parser.parse_args()
     archive, checksum, bootstrap = build(args.output_dir.resolve())

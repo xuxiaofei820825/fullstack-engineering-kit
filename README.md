@@ -60,7 +60,7 @@ cli/
 
 ```bash
 npm install --global \
-  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.2.0/fullstack-engineering-kit-cli-1.2.0.tgz"
+  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.3.0/fullstack-engineering-kit-cli-1.3.0.tgz"
 ```
 
 安装后可以使用完整命令 `fullstack-engineering-kit`，也可以使用短命令 `fsek`：
@@ -70,7 +70,7 @@ cd /path/to/target-project
 fsek init
 ```
 
-在交互终端中，`init` 会检测 `.agents`、`.codex` 和 `.claude`，显示平台选择界面，然后完成以下操作：
+在交互终端中，`init` 会检测 `.codex`、`.claude` 和 `.opencode`，显示平台选择界面，然后完成以下操作：
 
 1. 使用所选平台初始化 OpenSpec；
 2. 安装对应平台的 `full-stack-engineering-practices` Skill；
@@ -100,11 +100,11 @@ fsek init /path/to/target-project --yes
 
 | 参数 | Skill 目录 |
 |---|---|
-| `agents` | `.agents/skills/full-stack-engineering-practices/` |
 | `codex` | `.codex/skills/full-stack-engineering-practices/` |
 | `claude` | `.claude/skills/full-stack-engineering-practices/` |
+| `opencode` | `.opencode/skills/full-stack-engineering-practices/` |
 
-`update` 默认沿用初始化时记录的平台；显式传入另一个 `--platform` 可以迁移平台。`--dry-run` 只展示规范文件变更，`--skip-openspec` 用于已经由外部流程管理 OpenSpec 的环境。
+未指定平台时默认使用 Codex。`update` 默认沿用初始化时记录的平台；显式传入另一个 `--platform` 可以迁移平台。旧版安装在 `.agents` 中的 Skill 会在升级时迁移，但 `.agents` 不再作为新安装平台。`--dry-run` 只展示规范文件变更，`--skip-openspec` 用于已经由外部流程管理 OpenSpec 的环境。
 
 ### 兼容旧版 bootstrap 安装
 
@@ -114,11 +114,11 @@ fsek init /path/to/target-project --yes
 
 ```bash
 curl -fsSL \
-  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.2.0/bootstrap.sh" \
+  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.3.0/bootstrap.sh" \
 | bash -s -- \
     --repository xuxiaofei820825/fullstack-engineering-kit \
     --target . \
-    --version 1.2.0 \
+    --version 1.3.0 \
     --platform codex
 ```
 
@@ -130,7 +130,7 @@ curl -fsSL \
 
 ```bash
 cd /path/to/fullstack-engineering-kit
-./scripts/install.sh /path/to/target-project --version 1.2.0 --platform codex
+./scripts/install.sh /path/to/target-project --version 1.3.0 --platform codex
 ./scripts/verify-installation.sh /path/to/target-project
 ```
 
@@ -341,7 +341,7 @@ fsek verify
 
 ```bash
 fsek self-update --check
-fsek self-update --version 1.2.0
+fsek self-update --version 1.3.0
 ```
 
 `self-update` 会下载 CLI 包及对应 `.sha256`，校验通过后才调用 npm 全局安装。默认拒绝降级；私有 Release 可以通过 `GH_TOKEN` 或 `GITHUB_TOKEN` 认证。CLI 升级与项目升级保持分离，因此升级 CLI 后仍需在各项目中运行 `fsek update`。
@@ -364,11 +364,11 @@ fsek update --platform codex
 
 完整的版本准备、自动发布、验证和空 Release 修复步骤见 [发布指南](RELEASE.md)。
 
-`.github/workflows/release.yml` 只用于发布本规范仓库，不要求安装规范的目标项目托管在 GitHub。Pull Request 和 `main` 分支推送会运行验证；推送形如 `v1.2.0` 的标签时，发布任务会：
+`.github/workflows/release.yml` 只用于发布本规范仓库，不要求安装规范的目标项目托管在 GitHub。Pull Request 和 `main` 分支推送会运行验证；推送形如 `v1.3.0` 的标签时，发布任务会：
 
 1. 检查标签版本与 `VERSION` 完全一致。
 2. 在 GitHub 托管的 Ubuntu Runner 上执行完整 OpenSpec、Python 和安装流程验证。
-3. 构建可复现的 `fullstack-engineering-kit-1.2.0.tar.gz`。
+3. 构建可复现的 `fullstack-engineering-kit-1.3.0.tar.gz`。
 4. 生成对应的 `.sha256` 文件。
 5. 使用工作流内置的 `GITHUB_TOKEN` 创建 GitHub Release，并上传 CLI 包、兼容安装包、校验文件和 `bootstrap.sh`。
 
@@ -376,8 +376,8 @@ fsek update --platform codex
 
 ```bash
 ./scripts/build-release.sh dist
-tar -tzf dist/fullstack-engineering-kit-1.2.0.tar.gz
-tar -tzf dist/fullstack-engineering-kit-cli-1.2.0.tgz
+tar -tzf dist/fullstack-engineering-kit-1.3.0.tar.gz
+tar -tzf dist/fullstack-engineering-kit-cli-1.3.0.tgz
 ```
 
 创建标签前，应先更新 `VERSION`，运行完整验证，并通过代码审查。标签发布后不要复用同一版本覆盖包；修复内容应递增版本并发布新标签。

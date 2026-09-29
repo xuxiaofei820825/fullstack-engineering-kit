@@ -22,9 +22,9 @@ INSTALLATION_FILE = TOOL_DIRECTORY / "installation.json"
 SKILL_NAME = "full-stack-engineering-practices"
 SKILL_SOURCE = Path(f".agents/skills/{SKILL_NAME}")
 PLATFORM_SKILL_ROOTS = {
-    "agents": Path(".agents/skills"),
     "codex": Path(".codex/skills"),
     "claude": Path(".claude/skills"),
+    "opencode": Path(".opencode/skills"),
 }
 MANAGED_PATHS = (
     SKILL_SOURCE,
@@ -48,10 +48,10 @@ def source_root() -> Path:
 def bundle_version(root: Path) -> str:
     path = root / "VERSION"
     if not path.is_file():
-        raise InstallationError(f"缺少版本文件：{path}")
+        raise InstallationError(f"Missing version file: {path}")
     version = path.read_text(encoding="utf-8").strip()
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
-        raise InstallationError(f"VERSION 不是有效语义版本：{version!r}")
+        raise InstallationError(f"VERSION is not a valid semantic version: {version!r}")
     return version
 
 
@@ -128,7 +128,7 @@ def rendered_config(current: str | None, default_config: str, platform: str) -> 
         if re.match(r"^(?:[\"']schema[\"']|schema)\s*:", line)
     ]
     if len(schema_indexes) > 1:
-        raise InstallationError("openspec/config.yaml 包含多个顶层 schema，无法安全更新")
+        raise InstallationError("openspec/config.yaml contains multiple top-level schema keys and cannot be updated safely")
     if schema_indexes:
         index = schema_indexes[0]
         newline = "\r\n" if lines[index].endswith("\r\n") else "\n"
@@ -208,16 +208,16 @@ def install(
     update: bool,
     expected_version: str | None,
     dry_run: bool,
-    platform: str = "agents",
+    platform: str = "codex",
 ) -> list[str]:
     root = source_root()
     version = bundle_version(root)
     if expected_version and expected_version != version:
         raise InstallationError(
-            f"请求安装 {expected_version}，当前检出的规范套件版本是 {version}"
+            f"Requested version {expected_version}, but the checked-out kit version is {version}"
         )
     if not target.is_dir():
-        raise InstallationError(f"目标项目目录不存在：{target}")
+        raise InstallationError(f"Target project directory does not exist: {target}")
 
     operations: list[tuple[Path, Path]] = []
     conflicts: list[Path] = []
@@ -225,7 +225,7 @@ def install(
         source = root / source_relative
         destination = target / destination_relative
         if not source.exists():
-            raise InstallationError(f"规范套件缺少源文件：{source}")
+            raise InstallationError(f"The engineering kit is missing a source path: {source}")
         if destination.exists() and same_rendered_content(source, destination, platform):
             continue
         if destination.exists() and not update:
@@ -266,8 +266,8 @@ def install(
     if conflicts:
         formatted = "\n".join(f"  - {path}" for path in conflicts)
         raise InstallationError(
-            "以下已管理路径包含不同内容，未写入任何文件：\n"
-            f"{formatted}\n如需升级，请检查差异后显式使用 --update。"
+            "The following managed paths contain different content; no files were written:\n"
+            f"{formatted}\nReview the differences, then explicitly use --update to continue."
         )
 
     has_previous_installation = target_version.exists() or legacy_target_version.exists()
@@ -276,17 +276,19 @@ def install(
         for relative in LEGACY_INSTALLED_TOOL_PATHS
         if update and has_previous_installation and (target / relative).exists()
     ]
-    previous_platform: str | None = None
+    previous_skill_path: Path | None = None
     if current_metadata is not None:
         try:
             recorded_platform = json.loads(current_metadata).get("platform")
         except (AttributeError, json.JSONDecodeError):
             recorded_platform = None
         if recorded_platform in PLATFORM_SKILL_ROOTS:
-            previous_platform = recorded_platform
+            previous_skill_path = skill_path(recorded_platform)
+        elif recorded_platform == "agents":
+            # 兼容曾将 Skill 安装到 .agents 的旧版本，但不再将其作为可选平台。
+            previous_skill_path = SKILL_SOURCE
     elif has_previous_installation:
-        previous_platform = "agents"
-    previous_skill_path = skill_path(previous_platform) if previous_platform else None
+        previous_skill_path = SKILL_SOURCE
     legacy_skill_paths: list[Path] = []
     if (
         update
@@ -302,12 +304,12 @@ def install(
     if not target_version.exists() or target_version.read_text(encoding="utf-8").strip() != version:
         changes.append(VERSION_FILE)
     if legacy_target_version.exists():
-        changes.append(f"{LEGACY_VERSION_FILE}（删除旧版标记）")
+        changes.append(f"{LEGACY_VERSION_FILE} (remove legacy marker)")
     if current_metadata != new_metadata:
         changes.append(str(INSTALLATION_FILE))
     if update:
         changes.extend(
-            f"{path.relative_to(target)}（迁移旧版路径）"
+            f"{path.relative_to(target)} (migrate legacy path)"
             for path in (*legacy_tool_paths, *legacy_skill_paths)
         )
 
@@ -332,16 +334,16 @@ def install(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="安装可复用的编码规范和 OpenSpec schema")
-    parser.add_argument("target", type=Path, help="目标项目根目录")
-    parser.add_argument("--update", action="store_true", help="替换内容不同的已管理文件")
-    parser.add_argument("--version", help="要求当前检出版本与该版本完全一致")
-    parser.add_argument("--dry-run", action="store_true", help="只显示将发生的变更")
+    parser = argparse.ArgumentParser(description="Install the reusable engineering standards and OpenSpec schema")
+    parser.add_argument("target", type=Path, help="target project root")
+    parser.add_argument("--update", action="store_true", help="replace managed files whose content differs")
+    parser.add_argument("--version", help="require the checked-out kit to match this exact version")
+    parser.add_argument("--dry-run", action="store_true", help="show changes without writing files")
     parser.add_argument(
         "--platform",
         choices=tuple(PLATFORM_SKILL_ROOTS),
-        default="agents",
-        help="Skill 目标平台（默认 agents；可选 codex 或 claude）",
+        default="codex",
+        help="Skill target platform (default: codex; choices: claude or opencode)",
     )
     args = parser.parse_args()
 
@@ -357,13 +359,13 @@ def main() -> int:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2
 
-    prefix = "将更新" if args.dry_run else "已更新"
+    prefix = "Would update" if args.dry_run else "Updated"
     if changes:
-        print(f"{prefix} {len(changes)} 个路径：")
+        print(f"{prefix} {len(changes)} path(s):")
         for path in changes:
             print(f"  - {path}")
     else:
-        print("规范套件已经是当前版本，无需更新。")
+        print("The engineering kit is already up to date.")
     return 0
 
 
