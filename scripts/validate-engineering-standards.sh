@@ -8,5 +8,8 @@ cd "$project_root"
 
 openspec schema validate engineering-governed
 openspec validate --all --strict --no-interactive
-python3 -B -m unittest discover -s scripts/tests -p "test_*.py"
-python3 -B scripts/validate_openspec_designs.py
+python3 -B -m unittest discover -s "$script_dir/tests" -p "test_*.py"
+python3 -B "$script_dir/validate_openspec_designs.py"
+if [[ "$(basename "$script_dir")" == "scripts" ]]; then
+  npm test
+fi

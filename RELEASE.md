@@ -4,21 +4,23 @@
 
 ## 发布产物
 
-每个版本必须包含以下三个 Release 资产：
+每个版本必须包含以下五个 Release 资产：
 
 - `fullstack-engineering-kit-<VERSION>.tar.gz`
 - `fullstack-engineering-kit-<VERSION>.tar.gz.sha256`
+- `fullstack-engineering-kit-cli-<VERSION>.tgz`
+- `fullstack-engineering-kit-cli-<VERSION>.tgz.sha256`
 - `bootstrap.sh`
 
-`scripts/bootstrap.sh` 会下载压缩包及其 SHA-256 文件，完成校验后调用包内安装器。只创建 Git 标签或空 Release 无法完成远程安装。
+`.tgz` 是推荐安装的 npm CLI 包；原压缩包和 `bootstrap.sh` 继续用于兼容已有自动化。只创建 Git 标签或空 Release 无法完成终端程序安装。
 
 ## 发布前准备
 
 发布环境需要：
 
 - Git
-- Python 3.9 或更高版本
-- Node.js 和 npm
+- Python 3.10 或更高版本
+- Node.js 20.19 或更高版本和 npm
 - OpenSpec 1.9.0
 - 对仓库具有推送标签权限
 - 仓库已启用 GitHub Actions，并允许工作流使用 `contents: write` 权限创建 Release
@@ -40,14 +42,14 @@ git status --short
 
 推荐让 `.github/workflows/release.yml` 自动创建 Release 和上传资产。不要在推送标签前手动创建同名 Release，否则工作流中的 `gh release create` 会因 Release 已存在而失败。
 
-以下示例发布 `1.0.6`。实际发布时将版本替换为新的语义版本。
+以下示例发布 `1.2.0`。实际发布时将版本替换为新的语义版本。
 
 ### 1. 更新版本
 
 修改根目录 `VERSION`：
 
 ```text
-1.0.6
+1.2.0
 ```
 
 同步更新 README 中展示给用户的安装版本，确保下载标签、`--version` 参数和 `VERSION` 一致。
@@ -67,15 +69,18 @@ git status --short
 ```bash
 ./scripts/build-release.sh dist
 ls -l dist
-tar -tzf dist/fullstack-engineering-kit-1.0.6.tar.gz
+tar -tzf dist/fullstack-engineering-kit-1.2.0.tar.gz
+tar -tzf dist/fullstack-engineering-kit-cli-1.2.0.tgz
 ```
 
 预期生成：
 
 ```text
 dist/bootstrap.sh
-dist/fullstack-engineering-kit-1.0.6.tar.gz
-dist/fullstack-engineering-kit-1.0.6.tar.gz.sha256
+dist/fullstack-engineering-kit-1.2.0.tar.gz
+dist/fullstack-engineering-kit-1.2.0.tar.gz.sha256
+dist/fullstack-engineering-kit-cli-1.2.0.tgz
+dist/fullstack-engineering-kit-cli-1.2.0.tgz.sha256
 ```
 
 `dist/` 已被 `.gitignore` 忽略，不需要提交。
@@ -84,7 +89,7 @@ dist/fullstack-engineering-kit-1.0.6.tar.gz.sha256
 
 ```bash
 git add VERSION README.md
-git commit -m "chore: release v1.0.6"
+git commit -m "chore: release v1.2.0"
 git push origin main
 ```
 
@@ -95,8 +100,8 @@ git push origin main
 标签必须使用 `v<语义版本>` 格式，并与 `VERSION` 完全一致：
 
 ```bash
-git tag -a v1.0.6 -m "Release v1.0.6"
-git push origin v1.0.6
+git tag -a v1.2.0 -m "Release v1.2.0"
+git push origin v1.2.0
 ```
 
 推送标签后，GitHub Actions 会自动：
@@ -104,37 +109,36 @@ git push origin v1.0.6
 1. 安装 Python、Node.js 和 OpenSpec。
 2. 执行完整规范校验。
 3. 检查标签版本与 `VERSION` 是否一致。
-4. 构建压缩包、SHA-256 文件和 `bootstrap.sh`。
-5. 创建 GitHub Release 并上传三个资产。
+4. 构建 npm CLI 包、兼容压缩包、SHA-256 文件和 `bootstrap.sh`。
+5. 创建 GitHub Release 并上传五个资产。
 
 在仓库的 [Actions](https://github.com/xuxiaofei820825/fullstack-engineering-kit/actions) 页面确认 `Validate and release Fullstack Engineering Kit` 工作流成功。
 
 ### 6. 验证 Release
 
-打开 [Releases](https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases)，确认目标版本不是 Draft，并且包含三个发布资产。
+打开 [Releases](https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases)，确认目标版本不是 Draft，并且包含五个发布资产。
 
 也可以检查安装脚本 URL：
 
 ```bash
 curl -fsSIL \
-  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.0.6/bootstrap.sh"
+  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.2.0/bootstrap.sh"
 ```
 
-返回 HTTP 200 后，在一个已经执行过 `openspec init` 的测试项目中验证安装：
+返回 HTTP 200 后，优先验证终端程序包：
 
 ```bash
-cd /path/to/test-project
+npm install --global \
+  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.2.0/fullstack-engineering-kit-cli-1.2.0.tgz"
 
-curl -fsSL \
-  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.0.6/bootstrap.sh" \
-| bash -s -- \
-    --repository xuxiaofei820825/fullstack-engineering-kit \
-    --target . \
-    --version 1.0.6
-
-./scripts/verify-installation.sh .
-./scripts/validate-engineering-standards.sh
+mkdir /path/to/test-project
+fsek init /path/to/test-project --platform codex
+fsek doctor /path/to/test-project
+fsek verify /path/to/test-project
+fsek self-update --check
 ```
+
+随后再按需执行一次 `bootstrap.sh` 兼容安装验证。
 
 ## 处理已存在但为空的 Release
 
@@ -149,14 +153,16 @@ curl -fsSL \
 仅当 GitHub Actions 无法使用时，才采用手动发布。先完成前述验证和本地构建，然后执行：
 
 ```bash
-gh release create v1.0.6 \
-  dist/fullstack-engineering-kit-1.0.6.tar.gz \
-  dist/fullstack-engineering-kit-1.0.6.tar.gz.sha256 \
+gh release create v1.2.0 \
+  dist/fullstack-engineering-kit-1.2.0.tar.gz \
+  dist/fullstack-engineering-kit-1.2.0.tar.gz.sha256 \
+  dist/fullstack-engineering-kit-cli-1.2.0.tgz \
+  dist/fullstack-engineering-kit-cli-1.2.0.tgz.sha256 \
   dist/bootstrap.sh \
   --repo xuxiaofei820825/fullstack-engineering-kit \
   --verify-tag \
   --generate-notes \
-  --title "Fullstack Engineering Kit 1.0.6"
+  --title "Fullstack Engineering Kit 1.2.0"
 ```
 
 手动发布前必须先将对应标签推送到远端。发布后仍需检查资产 URL，并执行一次实际安装验证。
@@ -173,7 +179,7 @@ gh release create v1.0.6 \
 
 ### 标签版本检查失败
 
-确认标签去掉前缀 `v` 后与 `VERSION` 完全一致。例如 `VERSION` 为 `1.0.6` 时，标签必须为 `v1.0.6`。
+确认标签去掉前缀 `v` 后与 `VERSION` 完全一致。例如 `VERSION` 为 `1.2.0` 时，标签必须为 `v1.2.0`。
 
 ### 不要使用 main 或 latest 安装
 

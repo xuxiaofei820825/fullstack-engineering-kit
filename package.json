@@ -1,0 +1,41 @@
+{
+  "name": "@xuxiaofei820825/fullstack-engineering-kit",
+  "version": "1.2.0",
+  "description": "Initialize and update the Fullstack Engineering Kit in OpenSpec projects.",
+  "type": "module",
+  "bin": {
+    "fullstack-engineering-kit": "cli/fullstack-engineering-kit.mjs",
+    "fsek": "cli/fullstack-engineering-kit.mjs"
+  },
+  "files": [
+    ".agents/skills/full-stack-engineering-practices",
+    "cli/fullstack-engineering-kit.mjs",
+    "openspec/config.yaml",
+    "openspec/schemas/engineering-governed",
+    "scripts/install_engineering_standards.py",
+    "scripts/validate-engineering-standards.sh",
+    "scripts/validate_openspec_designs.py",
+    "scripts/verify_engineering_standards.py",
+    "scripts/tests/test_validate_openspec_designs.py",
+    "README.md",
+    "VERSION"
+  ],
+  "scripts": {
+    "test": "node --test cli/tests/*.test.mjs",
+    "pack:check": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "@fission-ai/openspec": "1.9.0"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xuxiaofei820825/fullstack-engineering-kit.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

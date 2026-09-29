@@ -53,10 +53,13 @@ class InstallEngineeringStandardsTest(unittest.TestCase):
             .read_text(encoding="utf-8")
             .strip(),
         )
-        validation_entrypoint = self.target / "scripts/validate-engineering-standards.sh"
+        validation_entrypoint = (
+            self.target / ".fullstack-engineering-kit/validate-engineering-standards.sh"
+        )
         self.assertTrue(validation_entrypoint.is_file())
         self.assertTrue(validation_entrypoint.stat().st_mode & 0o111)
         self.assertFalse((self.target / ".github").exists())
+        self.assertFalse((self.target / "scripts").exists())
         verification = self.run_script(VERIFIER, str(self.target), "--files-only")
         self.assertEqual(0, verification.returncode, verification.stderr)
 
@@ -71,6 +74,79 @@ class InstallEngineeringStandardsTest(unittest.TestCase):
         )
         self.assertEqual(0, second.returncode, second.stderr)
         self.assertIn("无需更新", second.stdout)
+
+    def test_installs_platform_specific_skill_without_touching_project_scripts(self) -> None:
+        project_script = self.target / "scripts/validate-engineering-standards.sh"
+        project_script.parent.mkdir(parents=True)
+        project_script.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+
+        result = self.run_script(INSTALLER, str(self.target), "--platform", "codex")
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        skill = self.target / ".codex/skills/full-stack-engineering-practices/SKILL.md"
+        self.assertTrue(skill.is_file())
+        self.assertFalse((self.target / ".agents").exists())
+        self.assertEqual("#!/usr/bin/env bash\n", project_script.read_text(encoding="utf-8"))
+        schema = self.target / "openspec/schemas/engineering-governed/schema.yaml"
+        self.assertIn(".codex/skills/full-stack-engineering-practices", schema.read_text())
+        verification = self.run_script(VERIFIER, str(self.target), "--files-only")
+        self.assertEqual(0, verification.returncode, verification.stderr)
+
+    def test_supports_claude_code_platform(self) -> None:
+        result = self.run_script(
+            INSTALLER,
+            str(self.target),
+            "--platform",
+            "claude",
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertTrue(
+            (self.target / ".claude/skills/full-stack-engineering-practices/SKILL.md").is_file()
+        )
+
+    def test_update_migrates_legacy_managed_paths(self) -> None:
+        installed = self.run_script(INSTALLER, str(self.target))
+        self.assertEqual(0, installed.returncode, installed.stderr)
+        legacy_script = self.target / "scripts/validate-engineering-standards.sh"
+        legacy_script.parent.mkdir(parents=True)
+        legacy_script.write_text("legacy\n", encoding="utf-8")
+
+        updated = self.run_script(
+            INSTALLER,
+            str(self.target),
+            "--platform",
+            "codex",
+            "--update",
+        )
+
+        self.assertEqual(0, updated.returncode, updated.stderr)
+        self.assertFalse((self.target / ".agents/skills/full-stack-engineering-practices").exists())
+        self.assertFalse(legacy_script.exists())
+        self.assertTrue(
+            (self.target / ".codex/skills/full-stack-engineering-practices/SKILL.md").is_file()
+        )
+
+    def test_platform_switch_only_removes_the_previously_selected_skill(self) -> None:
+        installed = self.run_script(INSTALLER, str(self.target), "--platform", "codex")
+        self.assertEqual(0, installed.returncode, installed.stderr)
+        unrelated_skill = self.target / ".agents/skills/full-stack-engineering-practices/SKILL.md"
+        unrelated_skill.parent.mkdir(parents=True)
+        unrelated_skill.write_text("user managed\n", encoding="utf-8")
+
+        switched = self.run_script(
+            INSTALLER,
+            str(self.target),
+            "--platform",
+            "claude",
+            "--update",
+        )
+
+        self.assertEqual(0, switched.returncode, switched.stderr)
+        self.assertFalse(
+            (self.target / ".codex/skills/full-stack-engineering-practices").exists()
+        )
+        self.assertEqual("user managed\n", unrelated_skill.read_text(encoding="utf-8"))
 
     def test_update_migrates_legacy_version_file(self) -> None:
         legacy_version = self.target / ".engineering-standards-version"

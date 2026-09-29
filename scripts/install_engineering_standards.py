@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import argparse
-import filecmp
+import json
 import os
 import re
 import shutil
@@ -17,13 +17,23 @@ from pathlib import Path
 SCHEMA_NAME = "engineering-governed"
 VERSION_FILE = ".fullstack-engineering-kit-version"
 LEGACY_VERSION_FILE = ".engineering-standards-version"
+TOOL_DIRECTORY = Path(".fullstack-engineering-kit")
+INSTALLATION_FILE = TOOL_DIRECTORY / "installation.json"
+SKILL_NAME = "full-stack-engineering-practices"
+SKILL_SOURCE = Path(f".agents/skills/{SKILL_NAME}")
+PLATFORM_SKILL_ROOTS = {
+    "agents": Path(".agents/skills"),
+    "codex": Path(".codex/skills"),
+    "claude": Path(".claude/skills"),
+}
 MANAGED_PATHS = (
-    Path(".agents/skills/full-stack-engineering-practices"),
+    SKILL_SOURCE,
     Path("openspec/schemas/engineering-governed"),
     Path("scripts/validate-engineering-standards.sh"),
     Path("scripts/validate_openspec_designs.py"),
     Path("scripts/tests/test_validate_openspec_designs.py"),
 )
+LEGACY_INSTALLED_TOOL_PATHS = MANAGED_PATHS[2:]
 IGNORED_NAMES = {"__pycache__", ".DS_Store"}
 
 
@@ -56,7 +66,40 @@ def comparable_files(root: Path) -> dict[Path, Path]:
     return files
 
 
-def same_content(source: Path, destination: Path) -> bool:
+def skill_path(platform: str) -> Path:
+    return PLATFORM_SKILL_ROOTS[platform] / SKILL_NAME
+
+
+def managed_paths(platform: str) -> tuple[tuple[Path, Path], ...]:
+    return (
+        (SKILL_SOURCE, skill_path(platform)),
+        (
+            Path("openspec/schemas/engineering-governed"),
+            Path("openspec/schemas/engineering-governed"),
+        ),
+        (
+            Path("scripts/validate-engineering-standards.sh"),
+            TOOL_DIRECTORY / "validate-engineering-standards.sh",
+        ),
+        (
+            Path("scripts/validate_openspec_designs.py"),
+            TOOL_DIRECTORY / "validate_openspec_designs.py",
+        ),
+        (
+            Path("scripts/tests/test_validate_openspec_designs.py"),
+            TOOL_DIRECTORY / "tests/test_validate_openspec_designs.py",
+        ),
+    )
+
+
+def render_bytes(content: bytes, platform: str) -> bytes:
+    return content.replace(
+        SKILL_SOURCE.as_posix().encode(),
+        skill_path(platform).as_posix().encode(),
+    )
+
+
+def same_rendered_content(source: Path, destination: Path, platform: str) -> bool:
     if source.is_file() != destination.is_file():
         return False
     source_files = comparable_files(source)
@@ -64,14 +107,19 @@ def same_content(source: Path, destination: Path) -> bool:
     if source_files.keys() != destination_files.keys():
         return False
     return all(
-        filecmp.cmp(source_files[relative], destination_files[relative], shallow=False)
+        render_bytes(source_files[relative].read_bytes(), platform)
+        == destination_files[relative].read_bytes()
         for relative in source_files
     )
 
 
-def rendered_config(current: str | None, default_config: str) -> str:
+def rendered_config(current: str | None, default_config: str, platform: str) -> str:
+    selected_skill_path = skill_path(platform).as_posix()
+    default_config = default_config.replace(SKILL_SOURCE.as_posix(), selected_skill_path)
     if current is None:
         return default_config
+
+    current = current.replace(SKILL_SOURCE.as_posix(), selected_skill_path)
 
     lines = current.splitlines(keepends=True)
     schema_indexes = [
@@ -105,7 +153,7 @@ def atomic_write(path: Path, content: str) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def replace_managed_path(source: Path, destination: Path) -> None:
+def replace_managed_path(source: Path, destination: Path, platform: str) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     staging_root = Path(
         tempfile.mkdtemp(prefix=".fullstack-engineering-kit-", dir=destination.parent)
@@ -117,6 +165,10 @@ def replace_managed_path(source: Path, destination: Path) -> None:
             shutil.copytree(source, staged, ignore=shutil.ignore_patterns(*IGNORED_NAMES))
         else:
             shutil.copy2(source, staged)
+        for staged_file in comparable_files(staged).values():
+            rendered = render_bytes(staged_file.read_bytes(), platform)
+            if rendered != staged_file.read_bytes():
+                staged_file.write_bytes(rendered)
         if destination.exists():
             destination.rename(backup)
         staged.rename(destination)
@@ -128,7 +180,36 @@ def replace_managed_path(source: Path, destination: Path) -> None:
         shutil.rmtree(staging_root, ignore_errors=True)
 
 
-def install(target: Path, update: bool, expected_version: str | None, dry_run: bool) -> list[str]:
+def installation_metadata(platform: str, version: str) -> str:
+    return json.dumps(
+        {
+            "platform": platform,
+            "skillPath": skill_path(platform).as_posix(),
+            "version": version,
+        },
+        ensure_ascii=False,
+        indent=2,
+        sort_keys=True,
+    ) + "\n"
+
+
+def remove_empty_parents(path: Path, stop: Path) -> None:
+    parent = path.parent
+    while parent != stop and parent != parent.parent:
+        try:
+            parent.rmdir()
+        except OSError:
+            break
+        parent = parent.parent
+
+
+def install(
+    target: Path,
+    update: bool,
+    expected_version: str | None,
+    dry_run: bool,
+    platform: str = "agents",
+) -> list[str]:
     root = source_root()
     version = bundle_version(root)
     if expected_version and expected_version != version:
@@ -140,15 +221,15 @@ def install(target: Path, update: bool, expected_version: str | None, dry_run: b
 
     operations: list[tuple[Path, Path]] = []
     conflicts: list[Path] = []
-    for relative in MANAGED_PATHS:
-        source = root / relative
-        destination = target / relative
+    for source_relative, destination_relative in managed_paths(platform):
+        source = root / source_relative
+        destination = target / destination_relative
         if not source.exists():
             raise InstallationError(f"规范套件缺少源文件：{source}")
-        if destination.exists() and same_content(source, destination):
+        if destination.exists() and same_rendered_content(source, destination, platform):
             continue
         if destination.exists() and not update:
-            conflicts.append(relative)
+            conflicts.append(destination_relative)
             continue
         operations.append((source, destination))
 
@@ -165,13 +246,6 @@ def install(target: Path, update: bool, expected_version: str | None, dry_run: b
     ):
         conflicts.append(Path(LEGACY_VERSION_FILE))
 
-    if conflicts:
-        formatted = "\n".join(f"  - {path}" for path in conflicts)
-        raise InstallationError(
-            "以下已管理路径包含不同内容，未写入任何文件：\n"
-            f"{formatted}\n如需升级，请检查差异后显式使用 --update。"
-        )
-
     config_path = target / "openspec/config.yaml"
     default_config = (root / "openspec/config.yaml").read_text(encoding="utf-8")
     if config_path.exists():
@@ -179,7 +253,48 @@ def install(target: Path, update: bool, expected_version: str | None, dry_run: b
             current_config = handle.read()
     else:
         current_config = None
-    new_config = rendered_config(current_config, default_config)
+    new_config = rendered_config(current_config, default_config, platform)
+
+    metadata_path = target / INSTALLATION_FILE
+    new_metadata = installation_metadata(platform, version)
+    current_metadata = (
+        metadata_path.read_text(encoding="utf-8") if metadata_path.is_file() else None
+    )
+    if current_metadata is not None and current_metadata != new_metadata and not update:
+        conflicts.append(INSTALLATION_FILE)
+
+    if conflicts:
+        formatted = "\n".join(f"  - {path}" for path in conflicts)
+        raise InstallationError(
+            "以下已管理路径包含不同内容，未写入任何文件：\n"
+            f"{formatted}\n如需升级，请检查差异后显式使用 --update。"
+        )
+
+    has_previous_installation = target_version.exists() or legacy_target_version.exists()
+    legacy_tool_paths = [
+        target / relative
+        for relative in LEGACY_INSTALLED_TOOL_PATHS
+        if update and has_previous_installation and (target / relative).exists()
+    ]
+    previous_platform: str | None = None
+    if current_metadata is not None:
+        try:
+            recorded_platform = json.loads(current_metadata).get("platform")
+        except (AttributeError, json.JSONDecodeError):
+            recorded_platform = None
+        if recorded_platform in PLATFORM_SKILL_ROOTS:
+            previous_platform = recorded_platform
+    elif has_previous_installation:
+        previous_platform = "agents"
+    previous_skill_path = skill_path(previous_platform) if previous_platform else None
+    legacy_skill_paths: list[Path] = []
+    if (
+        update
+        and previous_skill_path is not None
+        and previous_skill_path != skill_path(platform)
+        and (target / previous_skill_path).exists()
+    ):
+        legacy_skill_paths.append(target / previous_skill_path)
 
     changes = [str(destination.relative_to(target)) for _, destination in operations]
     if current_config != new_config:
@@ -188,16 +303,31 @@ def install(target: Path, update: bool, expected_version: str | None, dry_run: b
         changes.append(VERSION_FILE)
     if legacy_target_version.exists():
         changes.append(f"{LEGACY_VERSION_FILE}（删除旧版标记）")
+    if current_metadata != new_metadata:
+        changes.append(str(INSTALLATION_FILE))
+    if update:
+        changes.extend(
+            f"{path.relative_to(target)}（迁移旧版路径）"
+            for path in (*legacy_tool_paths, *legacy_skill_paths)
+        )
 
     if dry_run:
         return changes
 
     for source, destination in operations:
-        replace_managed_path(source, destination)
+        replace_managed_path(source, destination, platform)
     if current_config != new_config:
         atomic_write(config_path, new_config)
+    atomic_write(metadata_path, new_metadata)
     atomic_write(target_version, f"{version}\n")
     legacy_target_version.unlink(missing_ok=True)
+    if update and target != root:
+        for legacy_path in (*legacy_tool_paths, *legacy_skill_paths):
+            if legacy_path.is_dir():
+                shutil.rmtree(legacy_path)
+            else:
+                legacy_path.unlink()
+            remove_empty_parents(legacy_path, target)
     return changes
 
 
@@ -207,10 +337,22 @@ def main() -> int:
     parser.add_argument("--update", action="store_true", help="替换内容不同的已管理文件")
     parser.add_argument("--version", help="要求当前检出版本与该版本完全一致")
     parser.add_argument("--dry-run", action="store_true", help="只显示将发生的变更")
+    parser.add_argument(
+        "--platform",
+        choices=tuple(PLATFORM_SKILL_ROOTS),
+        default="agents",
+        help="Skill 目标平台（默认 agents；可选 codex 或 claude）",
+    )
     args = parser.parse_args()
 
     try:
-        changes = install(args.target.resolve(), args.update, args.version, args.dry_run)
+        changes = install(
+            args.target.resolve(),
+            args.update,
+            args.version,
+            args.dry_run,
+            args.platform,
+        )
     except InstallationError as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2

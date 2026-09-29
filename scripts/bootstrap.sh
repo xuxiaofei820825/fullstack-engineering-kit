@@ -9,9 +9,10 @@ version=""
 update=false
 dry_run=false
 use_gh=false
+platform="agents"
 
 usage() {
-  echo "Usage: bootstrap.sh --repository OWNER/REPO --version VERSION [--target DIRECTORY] [--use-gh] [--update] [--dry-run]" >&2
+  echo "Usage: bootstrap.sh --repository OWNER/REPO --version VERSION [--target DIRECTORY] [--platform agents|codex|claude] [--use-gh] [--update] [--dry-run]" >&2
 }
 
 while (($#)); do
@@ -31,6 +32,10 @@ while (($#)); do
     --use-gh)
       use_gh=true
       shift
+      ;;
+    --platform)
+      platform="${2:-}"
+      shift 2
       ;;
     --update)
       update=true
@@ -64,8 +69,12 @@ if [[ ! -d "$target" ]]; then
   echo "ERROR: 目标项目目录不存在：$target" >&2
   exit 2
 fi
-if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>/dev/null; then
-  echo "ERROR: 安装编码规范需要 Python 3.9 或更高版本" >&2
+if [[ "$platform" != "agents" && "$platform" != "codex" && "$platform" != "claude" ]]; then
+  echo "ERROR: --platform 必须是 agents、codex 或 claude" >&2
+  exit 2
+fi
+if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then
+  echo "ERROR: 安装编码规范需要 Python 3.10 或更高版本" >&2
   exit 2
 fi
 if [[ "$use_gh" == true ]]; then
@@ -159,7 +168,7 @@ if [[ ! -x "$installer" ]]; then
   exit 1
 fi
 
-install_arguments=("$target" --version "$version")
+install_arguments=("$target" --version "$version" --platform "$platform")
 if [[ "$update" == true ]]; then
   install_arguments+=(--update)
 fi
@@ -169,5 +178,6 @@ fi
 "$installer" "${install_arguments[@]}"
 
 if [[ "$dry_run" == false ]]; then
-  "$temporary_dir/${package_name}-${version}/scripts/verify-installation.sh" "$target" --files-only
+  "$temporary_dir/${package_name}-${version}/scripts/verify-installation.sh" \
+    "$target" --files-only --platform "$platform"
 fi

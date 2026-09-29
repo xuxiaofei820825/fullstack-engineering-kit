@@ -17,7 +17,7 @@ REQUIRED_SUBSECTIONS = (
     "规范偏离",
 )
 REFERENCE_PATTERN = re.compile(
-    r"(?:`)?(\.agents/skills/full-stack-engineering-practices/"
+    r"(?:`)?(\.(?:agents|codex|claude)/skills/full-stack-engineering-practices/"
     r"references/[A-Za-z0-9_./-]+\.md)(?:`)?"
 )
 HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)

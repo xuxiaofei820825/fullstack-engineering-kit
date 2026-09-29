@@ -47,50 +47,82 @@ scripts/
 ├── verify-installation.sh
 ├── validate-engineering-standards.sh
 └── validate_openspec_designs.py
+
+cli/
+└── fullstack-engineering-kit.mjs
 ```
 
 ## 安装到项目
 
-目标环境需要安装 OpenSpec 1.9.0、Python 3.9 或更高版本，并先在项目中初始化 OpenSpec：
+推荐使用随 GitHub Release 发布的终端程序。目标环境只需 Node.js 20.19 或更高版本和 Python 3.10 或更高版本；CLI 的 npm 包会安装固定版本的 OpenSpec 1.9.0。
+
+### 安装终端程序
 
 ```bash
-npm install -g @fission-ai/openspec@1.9.0
-cd /path/to/target-project
-openspec init
+npm install --global \
+  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.2.0/fullstack-engineering-kit-cli-1.2.0.tgz"
 ```
 
-### 从 GitHub Releases 一步安装
+安装后可以使用完整命令 `fullstack-engineering-kit`，也可以使用短命令 `fsek`：
 
-本仓库通过 GitHub Releases 发布版本化的完整安装包。用户不需要 clone 本仓库；`bootstrap.sh` 会把指定版本下载到临时目录，校验 SHA-256，调用原有安装器，并在完成后清理临时文件。
+```bash
+cd /path/to/target-project
+fsek init
+```
 
-公开仓库在已经执行过 `openspec init` 的目标项目中运行：
+在交互终端中，`init` 会检测 `.agents`、`.codex` 和 `.claude`，显示平台选择界面，然后完成以下操作：
+
+1. 使用所选平台初始化 OpenSpec；
+2. 安装对应平台的 `full-stack-engineering-practices` Skill；
+3. 安装并启用 `engineering-governed` schema；
+4. 写入安装版本和平台元数据；
+5. 将校验工具放入 `.fullstack-engineering-kit/`，不占用项目的 `scripts/`。
+
+CI 或其他非交互环境必须明确指定平台，或者使用 `--yes` 接受自动检测结果：
+
+```bash
+fsek init /path/to/target-project --platform codex
+fsek init /path/to/target-project --yes
+```
+
+### CLI 命令
+
+| 命令 | 用途 |
+|---|---|
+| `fsek init [path]` | 初始化 OpenSpec、Skill 和 schema |
+| `fsek update [path]` | 按安装元数据中的平台升级规范，并更新 OpenSpec 指令 |
+| `fsek self-update` | 从 GitHub Release 校验并升级全局 CLI |
+| `fsek verify [path]` | 验证受管文件、schema 和 OpenSpec 产物 |
+| `fsek doctor [path]` | 检查 Node.js、Python、OpenSpec 和项目安装状态 |
+| `fsek version` | 显示 CLI 和内置规范套件版本 |
+
+`--platform` 决定项目级 Skill 的安装位置：
+
+| 参数 | Skill 目录 |
+|---|---|
+| `agents` | `.agents/skills/full-stack-engineering-practices/` |
+| `codex` | `.codex/skills/full-stack-engineering-practices/` |
+| `claude` | `.claude/skills/full-stack-engineering-practices/` |
+
+`update` 默认沿用初始化时记录的平台；显式传入另一个 `--platform` 可以迁移平台。`--dry-run` 只展示规范文件变更，`--skip-openspec` 用于已经由外部流程管理 OpenSpec 的环境。
+
+### 兼容旧版 bootstrap 安装
+
+原有 `bootstrap.sh` 安装方式继续保留，便于已有自动化平滑迁移。新项目优先使用 `fsek init`。
+
+已初始化 OpenSpec 的项目可以运行：
 
 ```bash
 curl -fsSL \
-  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.0.6/bootstrap.sh" \
+  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.2.0/bootstrap.sh" \
 | bash -s -- \
     --repository xuxiaofei820825/fullstack-engineering-kit \
     --target . \
-    --version 1.0.6
+    --version 1.2.0 \
+    --platform codex
 ```
 
-私有仓库使用已经通过 `gh auth login` 认证的 GitHub CLI，或提前设置具有仓库读取权限的 `GH_TOKEN`：
-
-```bash
-gh release download v1.0.6 \
-  --repo xuxiaofei820825/fullstack-engineering-kit \
-  --pattern bootstrap.sh \
-  --output - \
-| bash -s -- \
-    --repository xuxiaofei820825/fullstack-engineering-kit \
-    --target . \
-    --version 1.0.6 \
-    --use-gh
-```
-
-也可以通过 `FULLSTACK_ENGINEERING_KIT_GITHUB_REPOSITORY=xuxiaofei820825/fullstack-engineering-kit` 设置默认仓库。旧环境变量 `ENGINEERING_STANDARDS_GITHUB_REPOSITORY` 暂时兼容；同时设置时优先使用新名称。安装命令必须明确指定语义版本，不接受 `main` 或 `latest`。升级时把版本改为目标版本并增加 `--update`。
-
-应将发布标签配置为受保护标签，并要求用户从可信渠道取得版本号和仓库地址。SHA-256 可以发现传输损坏或发布资产不一致，但不能替代 GitHub 权限控制、HTTPS 和受保护标签。
+私有仓库仍可使用 `gh release download` 获取 `bootstrap.sh` 并传入 `--use-gh`。`FULLSTACK_ENGINEERING_KIT_GITHUB_REPOSITORY` 可设置默认仓库；旧变量 `ENGINEERING_STANDARDS_GITHUB_REPOSITORY` 继续兼容。
 
 ### 从本地检出安装
 
@@ -98,19 +130,18 @@ gh release download v1.0.6 \
 
 ```bash
 cd /path/to/fullstack-engineering-kit
-./scripts/install.sh /path/to/target-project --version 1.0.6
+./scripts/install.sh /path/to/target-project --version 1.2.0 --platform codex
 ./scripts/verify-installation.sh /path/to/target-project
 ```
 
 安装器会安装：
 
-- `.agents/skills/full-stack-engineering-practices/`
+- 所选平台对应的 Skill 目录
 - `openspec/schemas/engineering-governed/`
-- design 校验器及其测试
-- 平台无关的统一质量门禁脚本
+- `.fullstack-engineering-kit/` 下的 design 校验器、测试和统一质量门禁脚本
 - `.fullstack-engineering-kit-version`
 
-从旧版本升级时，安装器会识别 `.engineering-standards-version`；使用 `--update` 成功升级后会写入新标记并删除旧标记。
+安装器不会创建或占用目标项目的 `scripts/`。从旧版本升级时，使用 `--update` 会迁移旧版放在 `scripts/` 下的受管校验文件，并迁移到新选择的平台目录；项目中其他脚本不受影响。安装器也会识别 `.engineering-standards-version`，升级后写入新标记并删除旧标记。
 
 目标项目没有 `openspec/config.yaml` 时，安装器使用本仓库的配置作为初始值。执行过 `openspec init` 的项目通常已经存在配置；此时安装器只把顶层 `schema` 更新为 `engineering-governed`，保留已有 context、rules 和其他项目配置。强制工作流规则维护在 schema 中，因此不会依赖目标项目复制本仓库的 context。
 
@@ -126,7 +157,7 @@ openspec schema validate engineering-governed
 
 ## 在 Codex 中使用 Skill
 
-从项目根目录或其子目录启动 Codex。Codex 会扫描仓库根目录到当前工作目录之间的 `.agents/skills`，因此项目内的 `full-stack-engineering-practices` 可以被自动发现。
+使用 `--platform codex` 安装后，从项目根目录或其子目录启动 Codex。项目内的 `.codex/skills/full-stack-engineering-practices` 会被自动发现。
 
 通常不需要手动指定 Skill：`engineering-governed` 会在 design、tasks 和 apply 指令中要求加载它。需要明确触发时，可以在 Codex CLI 或 IDE 中使用：
 
@@ -182,7 +213,7 @@ proposal 说明为什么修改、修改范围及受影响能力；specs 描述�
 
 design 阶段是 OpenSpec 与编码规范结合的关键点。schema 会要求代理：
 
-1. 读取 `.agents/skills/full-stack-engineering-practices/SKILL.md`。
+1. 读取当前平台目录下的 `full-stack-engineering-practices/SKILL.md`（Codex 为 `.codex/skills/...`）。
 2. 判断变更是后端、前端还是跨端。
 3. 按 Skill 路由加载全部适用 references。
 4. 完整填写“编码规范适用性”。
@@ -203,8 +234,8 @@ design 阶段是 OpenSpec 与编码规范结合的关键点。schema 会要求�
 
 | 规范文件 | 章节标题 | 适用原因 |
 |---|---|---|
-| `.agents/skills/full-stack-engineering-practices/references/backend/architecture-and-api.md` | API 设计 | 新增查询接口 |
-| `.agents/skills/full-stack-engineering-practices/references/integration.md` | 契约优先 | 前后端共同使用分页契约 |
+| `.codex/skills/full-stack-engineering-practices/references/backend/architecture-and-api.md` | API 设计 | 新增查询接口 |
+| `.codex/skills/full-stack-engineering-practices/references/integration.md` | 契约优先 | 前后端共同使用分页契约 |
 
 ### 规范落实
 
@@ -226,7 +257,7 @@ design 阶段是 OpenSpec 与编码规范结合的关键点。schema 会要求�
 完成 design 后运行：
 
 ```bash
-python3 -B scripts/validate_openspec_designs.py
+python3 -B .fullstack-engineering-kit/validate_openspec_designs.py
 ```
 
 ### Tasks
@@ -262,7 +293,7 @@ apply 阶段会再次加载 Skill、design 和适用 references。代码修改�
 
 ```bash
 openspec validate --all --strict --no-interactive
-python3 -B scripts/validate_openspec_designs.py
+python3 -B .fullstack-engineering-kit/validate_openspec_designs.py
 openspec archive add-order-export
 ```
 
@@ -273,7 +304,7 @@ openspec archive add-order-export
 安装后的项目通过一个平台无关的入口执行全部规范校验：
 
 ```bash
-./scripts/validate-engineering-standards.sh
+./.fullstack-engineering-kit/validate-engineering-standards.sh
 ```
 
 该脚本会执行：
@@ -296,25 +327,29 @@ openspec archive add-order-export
 
 ## 升级规范套件
 
-在目标项目中直接使用 GitHub Release 提供的 `bootstrap.sh`，把版本号改为需要升级到的明确版本，并增加 `--update`：
+先升级全局 CLI，再在项目中执行 `update`。项目的平台会从安装元数据自动读取：
 
 ```bash
-cd /path/to/target-project
+fsek self-update
 
-curl -fsSL \
-  "https://github.com/xuxiaofei820825/fullstack-engineering-kit/releases/download/v1.0.6/bootstrap.sh" \
-| bash -s -- \
-    --repository xuxiaofei820825/fullstack-engineering-kit \
-    --target . \
-    --version 1.0.6 \
-    --update
+cd /path/to/target-project
+fsek update
+fsek verify
 ```
 
-如果已经检出本仓库，也可以使用本地安装器：
+只检查新版本或安装指定版本：
 
 ```bash
-./scripts/install.sh /path/to/target-project --update --version 1.0.6
-./scripts/verify-installation.sh /path/to/target-project
+fsek self-update --check
+fsek self-update --version 1.2.0
+```
+
+`self-update` 会下载 CLI 包及对应 `.sha256`，校验通过后才调用 npm 全局安装。默认拒绝降级；私有 Release 可以通过 `GH_TOKEN` 或 `GITHUB_TOKEN` 认证。CLI 升级与项目升级保持分离，因此升级 CLI 后仍需在各项目中运行 `fsek update`。
+
+切换平台时显式指定目标：
+
+```bash
+fsek update --platform codex
 ```
 
 安装器遇到内容不同的已管理文件时默认停止且不写入。`--update` 会替换 Skill、schema、校验器和统一质量门禁脚本等已管理文件，但不会覆盖目标项目的 `openspec/config.yaml`；该文件仍只更新顶层 `schema`。建议通过项目实际采用的代码审查流程检查安装或升级产生的差异。
@@ -329,19 +364,20 @@ curl -fsSL \
 
 完整的版本准备、自动发布、验证和空 Release 修复步骤见 [发布指南](RELEASE.md)。
 
-`.github/workflows/release.yml` 只用于发布本规范仓库，不要求安装规范的目标项目托管在 GitHub。Pull Request 和 `main` 分支推送会运行验证；推送形如 `v1.0.6` 的标签时，发布任务会：
+`.github/workflows/release.yml` 只用于发布本规范仓库，不要求安装规范的目标项目托管在 GitHub。Pull Request 和 `main` 分支推送会运行验证；推送形如 `v1.2.0` 的标签时，发布任务会：
 
 1. 检查标签版本与 `VERSION` 完全一致。
 2. 在 GitHub 托管的 Ubuntu Runner 上执行完整 OpenSpec、Python 和安装流程验证。
-3. 构建可复现的 `fullstack-engineering-kit-1.0.6.tar.gz`。
+3. 构建可复现的 `fullstack-engineering-kit-1.2.0.tar.gz`。
 4. 生成对应的 `.sha256` 文件。
-5. 使用工作流内置的 `GITHUB_TOKEN` 创建 GitHub Release，并上传归档、校验文件和 `bootstrap.sh`。
+5. 使用工作流内置的 `GITHUB_TOKEN` 创建 GitHub Release，并上传 CLI 包、兼容安装包、校验文件和 `bootstrap.sh`。
 
 发布前可以在本地检查产物：
 
 ```bash
 ./scripts/build-release.sh dist
-tar -tzf dist/fullstack-engineering-kit-1.0.6.tar.gz
+tar -tzf dist/fullstack-engineering-kit-1.2.0.tar.gz
+tar -tzf dist/fullstack-engineering-kit-cli-1.2.0.tgz
 ```
 
 创建标签前，应先更新 `VERSION`，运行完整验证，并通过代码审查。标签发布后不要复用同一版本覆盖包；修复内容应递增版本并发布新标签。

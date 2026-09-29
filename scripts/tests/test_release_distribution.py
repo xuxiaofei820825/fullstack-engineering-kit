@@ -15,6 +15,7 @@ BUILD_SCRIPT = REPOSITORY_ROOT / "scripts/build-release.sh"
 BOOTSTRAP = REPOSITORY_ROOT / "scripts/bootstrap.sh"
 VERSION = (REPOSITORY_ROOT / "VERSION").read_text(encoding="utf-8").strip()
 ARCHIVE_NAME = f"fullstack-engineering-kit-{VERSION}.tar.gz"
+CLI_ARCHIVE_NAME = f"fullstack-engineering-kit-cli-{VERSION}.tgz"
 
 
 class ReleaseDistributionTest(unittest.TestCase):
@@ -39,11 +40,22 @@ class ReleaseDistributionTest(unittest.TestCase):
             first_archive = first / ARCHIVE_NAME
             second_archive = second / ARCHIVE_NAME
             self.assertEqual(first_archive.read_bytes(), second_archive.read_bytes())
+            first_cli_archive = first / CLI_ARCHIVE_NAME
+            second_cli_archive = second / CLI_ARCHIVE_NAME
+            self.assertEqual(first_cli_archive.read_bytes(), second_cli_archive.read_bytes())
 
             checksum_line = (first / f"{ARCHIVE_NAME}.sha256").read_text(encoding="utf-8")
             self.assertEqual(
                 f"{hashlib.sha256(first_archive.read_bytes()).hexdigest()}  {ARCHIVE_NAME}\n",
                 checksum_line,
+            )
+            cli_checksum_line = (first / f"{CLI_ARCHIVE_NAME}.sha256").read_text(
+                encoding="utf-8"
+            )
+            self.assertEqual(
+                f"{hashlib.sha256(first_cli_archive.read_bytes()).hexdigest()}  "
+                f"{CLI_ARCHIVE_NAME}\n",
+                cli_checksum_line,
             )
             self.assertEqual(
                 (REPOSITORY_ROOT / "scripts/bootstrap.sh").read_bytes(),
@@ -59,6 +71,13 @@ class ReleaseDistributionTest(unittest.TestCase):
                     names,
                 )
                 self.assertFalse(any("/.git/" in name for name in names))
+            with tarfile.open(first_cli_archive, "r:gz") as archive:
+                names = set(archive.getnames())
+                self.assertIn("package/cli/fullstack-engineering-kit.mjs", names)
+                self.assertIn(
+                    "package/.agents/skills/full-stack-engineering-practices/SKILL.md",
+                    names,
+                )
 
     def test_bootstrap_downloads_verifies_and_installs_package(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -103,6 +122,8 @@ shutil.copyfile(source, output)
                     VERSION,
                     "--target",
                     str(target),
+                    "--platform",
+                    "codex",
                 ],
                 cwd=REPOSITORY_ROOT,
                 env={
@@ -127,8 +148,9 @@ shutil.copyfile(source, output)
                 .strip(),
             )
             self.assertTrue(
-                (target / ".agents/skills/full-stack-engineering-practices/SKILL.md").is_file()
+                (target / ".codex/skills/full-stack-engineering-practices/SKILL.md").is_file()
             )
+            self.assertFalse((target / "scripts").exists())
 
     def test_bootstrap_requires_an_explicit_version(self) -> None:
         result = subprocess.run(
